@@ -1,8 +1,4 @@
-# src/evaluation_runner.py - Zeile ~25
 
-
-
-# evaluation_runner.py
 
 import yaml
 import json
@@ -16,7 +12,7 @@ from utils.data_loader import load_test_data
 from utils.result_saver import save_results
 
 
-def run_task_for_model(
+def run_each_task(
     model, 
     model_config, 
     task_def, 
@@ -58,7 +54,7 @@ def run_task_for_model(
     if task_def["input_source"].startswith("results_of:"):
         # Input aus vorheriger Task
         if previous_results is None:
-            print(f"  Fehler: Keine vorherigen Ergebnisse für {task_def['input_source']}")
+            print(f"  Fehler: Keine vorherigen Ergebnisse für {task_def['input_file']}")
             return []
         input_data = previous_results
     else:
@@ -66,13 +62,13 @@ def run_task_for_model(
         input_file = os.path.join(
             global_config["paths"]["unsafe_directory"],
             "input_data",
-            task_def["input_source"]
+            task_def["input_file"]
         )
         input_data = load_test_data(input_file)
     
     # 3. Führe Model für jede Eingabe aus
     results = []
-    for case in input_data[:5]:  # Limit auf 5 für schnelle Tests
+    for case in input_data:
         # Baue User-Text
         if "transcript" in user_template:
             user_text = user_template.format(transcript=case.get("text", ""))
@@ -87,7 +83,7 @@ def run_task_for_model(
             user_text = user_template
         
         # Baue Messages
-        messages = build_messages(system_text, user_text, model_config)
+        messages = build_messages(system_text, user_text, model_config) # Funktion aus prompt_formatter
         
         # Generiere Output
         try:
@@ -123,7 +119,7 @@ def parse_json_output(response_text: str):
         return {"raw": response_text[:200]}
 
 
-def run_evaluation_for_model(model_name, selected_tasks=None, selected_variants=None):
+def run_all_tasks(model_name, selected_tasks=None, selected_variants=None):
     """
     Führt alle Tasks für ein Modell aus.
     
@@ -147,8 +143,8 @@ def run_evaluation_for_model(model_name, selected_tasks=None, selected_variants=
     task_results = {}
     
     # Führe Tasks in Reihenfolge aus
-    for task_def in tasks_config["tasks"]:
-        task_id = task_def["id"]
+    for task in tasks_config["tasks"]:
+        task_id = task["id"]
         
         if selected_tasks and task_id not in selected_tasks:
             continue
@@ -157,22 +153,22 @@ def run_evaluation_for_model(model_name, selected_tasks=None, selected_variants=
         
         # Lade vorherige Task-Ergebnisse falls nötig
         previous_results = None
-        if task_def["input_source"].startswith("results_of:"):
-            prev_task_id = task_def["input_source"].replace("results_of:", "")
+        if task["input_file"].startswith("results_of"):
+            prev_task_id = task["input_file"].replace("results_of", "")
             if prev_task_id in task_results:
                 previous_results = task_results[prev_task_id]
         
         # Führe jede Prompt-Variante aus
-        for variant_def in task_def["prompt_variants"]:
+        for variant_def in task["prompt_variants"]:
             variant_id = variant_def["id"]
             
             if selected_variants and variant_id not in selected_variants:
                 continue
             
-            results = run_task_for_model(
+            results = run_each_task(
                 model,
                 model_spec,
-                task_def,
+                task,
                 variant_def,
                 global_config,
                 previous_results
