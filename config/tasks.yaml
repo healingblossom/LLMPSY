@@ -1,7 +1,7 @@
 tasks: # muss noch mal bearbeitet werden, insbesondere in anbetracht der MDD+BD Aufteilung
     - task_id: "task_1_symptom_detection_and_sectioning"
       description: "detection and sectioning of symptoms in given scid-interview"
-      input_file: "data.csv" # noch nicht klar, wie die datei heißt
+      input_file: ["data.csv"] # noch nicht klar, wie die datei heißt
       prompt_variants: 
           - id: "no_role_zeroshot"
             template: "task1_zeroshot_no_role"
@@ -20,15 +20,15 @@ tasks: # muss noch mal bearbeitet werden, insbesondere in anbetracht der MDD+BD 
 
     - task_id: "task_2_dsm5_criteria"
       description: "mapping of dsm5 criteria with interview and symptom-list"
-      input_file: ["data.csv" , "symptoms.csv"]
+      input_file: ["data.csv" , "results_of_1_symptoms.csv"]
 
     - task_id: "task_3_diagnostic"
       description: "diagnostic of patient through diagnostic criteria"
-      input_file: ["criteria.csv"]
+      input_file: ["results_of_2_criteria.csv"]
       
     - task_id: "task_4_summary"
       description: "generation of interview-summary through interview, symptom-list and diagnostic criteria list"
-      input_file: ["data.csv" , "symptoms.csv" , "criteria.csv"]
+      input_file: ["data.csv" , "results_of_1_symptoms.csv" , "results_of_2_criteria.csv"]
 
     - task_id: "task_5_complexity"
       description: "assesment of patient complexity in diagnostic"
