@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environments
+.env
+*.env
+.venv/
+venv/
+.envrc
+
+# Conda envs
+.conda_envs/
+
+# Jupyter Notebooks Checkpoints
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+# IDE
+.idea/
+
+# OS-spezifisch (DS_Store für macOS nutzer, Thumbs.db für windows)
+.DS_Store
+Thumbs.db
+
+# Results
+results/
+logs/
+
+# Cache-Verzeichnisse
+.cache/
+huggingface/

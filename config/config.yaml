@@ -1,0 +1,25 @@
+# config.yaml Zentraler Speicherort für alle Konfigurationen, die nötig sind
+
+paths:
+    proj_directory: "/sc-projects/sc-proj-dhzc-psycho/LLMPSY"
+    scratch_directory: "/sc-scratch/sc-scratch-dhzc-psycho/data"
+    conda_env_directory: "/sc-projects/sc-proj-dhzc-psycho/envs"
+
+models: #legende: Modellnamen klein geschrieben
+    - name: "mistral"
+      source: "hpc"
+      conda_env: "gpulab_env" 
+      path: "/sc-resources/llms/mistralai/Mistral-7B-Instruct-v0.3"
+      description: "ein LLM das schon vom HPC eingerichtet wurde, zum start"
+
+models: 
+    - name: "mental_alpaca"
+      source: "local_download"
+      conda_env: "mentalalpaca_env"
+      path: "/sc-scratch/sc-scratch-dhzc-psycho/data/models/mental-alpaca"
+      description: "das MentalAlpaca LLM, das in einem Paper entstanden auf einen Mental-Health Social-Mediabeiträge Datensatz gefinetuned wurde"
+
+logging: # anscheinend stellt das ein, wie viel geloggt wird von den Fehlermeldungen/Warnings während des laufens, musst du dann sehen
+  level: "INFO"
+  log_file: "evaluation.log"
+  
