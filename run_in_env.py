@@ -54,7 +54,7 @@ if __name__ == '__main__':
     print("="*60)
 
     # Beispiel: Env liegt unter .conda_envs/env_custom
-    exit_code = run_in_conda_env_path('gpulab_env', 'model_scripts/pipeline_mistral.py')
+    exit_code = run_in_conda_env_path('gpulab_env', 'model_scripts/archiev_version_pipeline_mistral.py')
 
     if exit_code == 0:
         print("\nrun_in_conda_env_path funktioniert")
