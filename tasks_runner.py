@@ -51,7 +51,7 @@ def run_each_task(
     user_template = prompt_template["user_template"]
     
     # 2. Lade Eingabedaten
-    if task_def["input_source"].startswith("results_of:"):
+    if list(filter(lambda input: input.startswith("results_of") , task_def["input_file"])): # existieren einträge in input_files, die results früherer tasks sind
         # Input aus vorheriger Task
         if previous_results is None:
             print(f"  Fehler: Keine vorherigen Ergebnisse für {task_def['input_file']}")
@@ -176,7 +176,7 @@ def run_all_tasks(model_name, selected_tasks=None, selected_variants=None):
             
             # Speichere Ergebnisse
             task_key = f"{task_id}_{variant_id}"
-            task_results[task_id] = results  # Für nächste Task
+            task_results[task_key] = results  # Für nächste Task
             
             save_results(
                 global_config,
