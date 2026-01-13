@@ -6,23 +6,22 @@ import shutil
 
 class ModelManager:
     """Intelligentes Laden und Cleanup von Modellen"""
-    
-    def __init__(self, config_path='config.yaml'):
+
+    # Konstruktor der Modelle, speichert die configs als Class-Parameter und ruft die Pfade auf
+    def __init__(self, model_name):
         """Initialisiere mit Config"""
-        with open(config_path) as f:
+        with open('config.yaml') as f:
             self.config = yaml.safe_load(f)
-        
-        self.scratch_dir = self.config['paths']['scratch_directory']
-        print("ModelManager initialisiert")
-        print(f"   Project Dir: {self.config['paths']['proj_directory']}")
-        print(f"   Scratch Dir: {self.config['paths']['scratch_directory']}")
+
+        for each_model in self.config['models']:
+            if each_model['name'] == model_name:
+                self.model_spec = each_model
+        raise ValueError(f"Modell '{model_name}' nicht in config.yaml gefunden!")
     
     def get_model_spec(self, model_name):
         """Finde Modell-Spec in Config"""
-        for model in self.config['models']:
-            if model['name'] == model_name:
-                return model
-        raise ValueError(f"Modell '{model_name}' nicht in config.yaml gefunden!")
+
+        return self.model_spec
     
     def load_model(self, model_name):
         """
