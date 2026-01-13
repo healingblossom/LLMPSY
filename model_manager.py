@@ -4,6 +4,9 @@ import os
 import yaml
 import shutil
 
+from model_scripts.mental_alpaca import MentalAlpacaWrapper
+from model_scripts.mistral import MistralWrapper
+
 class ModelManager:
     """Intelligentes Laden und Cleanup von Modellen"""
 
@@ -63,9 +66,9 @@ class ModelManager:
         print("   Modell-Pfad gefunden, lade Modell...")
 
         if model_name == "mental_alpaca":
-            return MentalAlpacaWrapper(model_path, model_spec)
+            return MentalAlpacaWrapper()
         elif model_name == "mistral":
-            return MistralWrapper(model_path, model_spec)# Wrapper not done yet, look into the MentalAlpacaWrapper for inspo
+            return MistralWrapper(model_path)# Wrapper not done yet, look into the MentalAlpacaWrapper for inspo
         else:
             raise ValueError(f"Unbekanntes Modell: {model_name}")
     
@@ -90,45 +93,6 @@ class ModelManager:
                 print(f"   Gelöscht: {model_path}")
             else:
                 print(f"   Pfad existiert nicht: {model_path}")
-
-
-class MentalAlpacaWrapper:
-    def __init__(self, model_path, model_spec):
-        from transformers import AutoModelForCausalLM, AutoTokenizer
-        import torch
-        self.tokenizer = AutoTokenizer.from_pretrained("NEU-HAI/Llama-2-7b-alpaca-cleaned", use_fast=False)
-        self.tokenizer.pad_token = self.tokenizer.unk_token
-        self.model = AutoModelForCausalLM.from_pretrained( "NEU-HAI/Llama-2-7b-alpaca-cleaned", load_in_8bit=True, device_map="auto", torch_dtype=torch.float16)
-
-    def generate_from_messages(self, messages):
-        self.tokenizer.chat_template = """Below is an instruction that describes a task, paired with an input that provides further context. 
-Write a response that appropriately completes the request.
-
-### Instruction:
-{% for message in messages if message['role'] == 'system' %}{{ message['content'] }}{% endfor %}
-
-### Input:
-{% for message in messages if message['role'] == 'user' %}{{ message['content'] }}{% endfor %}
-
-### Response:
-"""
-
-        prompt = self.tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True,
-        )
-        inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
-        
-        with torch.no_grad():
-            outputs = model.generate(
-                inputs.input_ids,
-                max_new_tokens=150,
-                do_sample=False,  # Use greedy decoding
-                pad_token_id=tokenizer.pad_token_id,
-                eos_token_id=tokenizer.eos_token_id
-                )
-        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 
 # TESTING: Wenn direkt ausgeführt
