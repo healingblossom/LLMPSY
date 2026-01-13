@@ -54,11 +54,12 @@ class ModelManager:
         model_name = model_spec['name']
         model_path = model_spec['path']
     
-        print(f"   Pfad: {model_path}")
+        print(f"  Model Pfad: {model_path}")
     
         # Prüfe, ob Pfad existiert
         if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Modell-Pfad existiert nicht: {model_path}")
+            raise FileNotFoundError(f"Modell-Pfad existiert nicht: {model_path}"
+                                    f", stell sicher, dass das Modell vorhanden und der richtige Pfad angegeben ist")
     
         print("   Modell-Pfad gefunden, lade Modell...")
 
@@ -72,7 +73,7 @@ class ModelManager:
     def cleanup_model(self, model_name):
         """
         Cleanup nach Modell-Nutzung.
-        Für Server-Modelle: Nichts löschen!
+        Für HPC-Modelle: Nichts löschen!
         """
         model_spec = self.get_model_spec(model_name)
         source = model_spec['source']
@@ -81,7 +82,7 @@ class ModelManager:
         print(f"   Source: {source}")
         
         if source == 'hpc':
-            print("   Server-Modell wird nicht gelöscht")
+            print("   HPC-Server-Modell wird nicht gelöscht")
         
         elif source == 'local_download':
             model_path = f"{self.scratch_dir}/downloaded_models/{model_name}"

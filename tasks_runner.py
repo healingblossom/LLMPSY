@@ -3,7 +3,6 @@
 import yaml
 import json
 import os
-import sys
 
 from model_manager import ModelManager
 from prompt_formatter import build_messages

@@ -3,7 +3,7 @@
 paths:
     proj_directory: "/sc-projects/sc-proj-dhzc-psycho/LLMPSY"
     scratch_directory: "/sc-scratch/sc-scratch-dhzc-psycho/data"
-    conda_env_directory: "/sc-projects/sc-proj-dhzc-psycho/envs"
+    conda_env_directory: "/sc-projects/sc-proj-dhzc-psycho/LLMPSY/.conda_envs"
 
 models: #legende: Modellnamen klein geschrieben
     - name: "mistral"
@@ -12,7 +12,6 @@ models: #legende: Modellnamen klein geschrieben
       path: "/sc-resources/llms/mistralai/Mistral-7B-Instruct-v0.3"
       description: "ein LLM das schon vom HPC eingerichtet wurde, zum start"
 
-models: 
     - name: "mental_alpaca"
       source: "local_download"
       conda_env: "mentalalpaca_env"

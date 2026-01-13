@@ -3,13 +3,15 @@
 import subprocess
 import sys
 import os
+import yaml
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-# Wenn dieses File im Projekt-Root liegt:
-CONDA_ENVS_ROOT = os.path.join(PROJECT_ROOT, ".conda_envs")
+with open("config.yaml") as f:
+    config = yaml.safe_load(f)
+CONDA_ENVS_ROOT = config['paths']['proj_directory']
+PROJECT_ROOT = config['paths']['conda_env_directory']
 
 
-def run_in_conda_env_path(env_name, python_script, script_args=None):
+def run_in_conda_env(env_name, python_script, script_args=None):
     """
     Führt ein Python-Script in einem conda-Environment aus, das
     in .conda_envs im Projekt liegt.
@@ -53,8 +55,8 @@ if __name__ == '__main__':
     print("Teste run_in_env_path")
     print("="*60)
 
-    # Beispiel: Env liegt unter .conda_envs/env_custom
-    exit_code = run_in_conda_env_path('gpulab_env', 'model_scripts/archiev_version_pipeline_mistral.py')
+    # Beispiel:
+    exit_code = run_in_conda_env('gpulab_env', 'model_scripts/archiev_version_pipeline_mistral.py')
 
     if exit_code == 0:
         print("\nrun_in_conda_env_path funktioniert")

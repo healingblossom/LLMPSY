@@ -3,7 +3,7 @@
 
 import sys
 import yaml
-from run_in_env import run_in_conda_env_path
+from run_in_env import run_in_conda_env
 
 print("\n" + "="*60)
 print("STARTE LLM-EVALUIERUNG")
@@ -33,7 +33,7 @@ try:
         unknown = set(selected_models) - {m['name'] for m in all_models}
         if unknown:
             print(f"\nWarnung: folgende Modelle stehen nicht in config.yaml: {', '.join(unknown)}")
-        print(f"   {len(models)} Modell(e) werden tatsächlich ausgeführt")
+        print(f"   {len(models)} werden tatsächlich ausgeführt")
     else:
         models = all_models
 
@@ -48,7 +48,7 @@ try:
     for model_spec in models:
         model_name = model_spec['name']
         env_name = model_spec['conda_env']
-        script = f"model_scripts/pipeline_{model_name}.py"
+        script = f"model_scripts/{model_name}.py"
         
         print(f"\n{'='*60}")
         print(f"Modell: {model_name}")
@@ -57,7 +57,7 @@ try:
         print(f"{'='*60}")
         
         try:
-            exit_code = run_in_conda_env_path(env_name, script)
+            exit_code = run_in_conda_env(env_name, script)
             
             if exit_code == 0:
                 print(f"{model_name} erfolgreich")
