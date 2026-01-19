@@ -1,6 +1,6 @@
 # mental_alpaca.py
 from model_manager import model
-from prompts.prompt_builder  import ModelFormatBuilder
+from prompts.prompt_builder  import ModelFormatBuilder, PromptVariant
 from tasks_runner import run_all_tasks
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
