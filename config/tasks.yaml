@@ -1,35 +1,47 @@
 tasks: # muss noch mal bearbeitet werden, insbesondere in anbetracht der MDD+BD Aufteilung
     - task_id: "task_1_symptom_detection_and_sectioning"
       description: "detection and sectioning of symptoms in given scid-interview"
-      input_file: ["data.csv"] # noch nicht klar, wie die datei heißt
-      prompt_variants: 
-          - id: "no_role_zeroshot"
-            template: "task1_zeroshot_no_role"
-          - id: "no_role_oneshot"
-            template: "task1_oneshot_no_role"
-          - id: "no_role_fewshot"
-            template: "task1_fewshot_no_role"
-          - id: "role_zeroshot"
-            template: "task1_zeroshot_role"
-          - id: "role_oneshot"
-            template: "task1_oneshot_role"
-          - id: "role_fewshot"
-            template: "task1_fewshot_role"
-      output_schema: "symptom_list_json"
-      feeds_into: []
+      snippet_config:
+        role: [ "role", "none" ]
+        task: [ "task1_extract_symptoms" ]
+        examples: [ "zeroshot", "oneshot", "fewshot" ]
+        inputs: [ "transcript" ]
+        output_format: ["task1_symptom_format"]
+        episodes_divided: true
+        symptom_variants: [ "depression", "mania" ]
+        includes_cot: false
 
-    - task_id: "task_2_dsm5_criteria"
-      description: "mapping of dsm5 criteria with interview and symptom-list"
-      input_file: ["data.csv" , "results_of_1_symptoms.csv"]
+    - task_id: "task_2_diagnostic_criteria"
+      description: "mapping of diagnostic criteria with interview and symptom-list"
+      snippet_config:
+        role: [ "role", "none" ]
+        includes_cot: true
+        cot: ["cot", "none"]
+        task: [ "task2_diagnostic_criteria_mapping" ]
+        examples: [ "zeroshot", "oneshot", "fewshot" ]
+        inputs: [ "transcript" , "input_from_task1"]
+        output_format: ["task2_diagnostic_criteria_format"]
+        episodes_divided: true
+        symptom_variants: [ "depression", "mania" ]
 
     - task_id: "task_3_diagnostic"
       description: "diagnostic of patient through diagnostic criteria"
-      input_file: ["results_of_2_criteria.csv"]
-      
+      snippet_config:
+        role: [ "role", "none" ]
+        includes_cot: true
+        cot: [ "cot", "none" ]
+        task: [ "task3_diagnosis_prediction" ]
+        examples: [ "zeroshot", "oneshot", "fewshot" ]
+        inputs: [ "input_from_task2" ]
+        output_format: ["task3_diagnosis_format"]
+        episodes_divided: false
+
     - task_id: "task_4_summary"
       description: "generation of interview-summary through interview, symptom-list and diagnostic criteria list"
-      input_file: ["data.csv" , "results_of_1_symptoms.csv" , "results_of_2_criteria.csv"]
+      snippet_config:
+        task: [ "task4_summary" ]
+        inputs: [ "transcript", "input_from_task1" ,"input_from_task2", "input_from_task3"]
+        output_format: ["task4_summary_format"]
+        episodes_divided: false
+        includes_cot: false
 
-    - task_id: "task_5_complexity"
-      description: "assesment of patient complexity in diagnostic"
-      input_file: ["data.csv"]

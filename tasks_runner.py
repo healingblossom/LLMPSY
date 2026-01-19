@@ -5,7 +5,6 @@ import json
 import os
 
 from model_manager import ModelManager
-from prompt_formatter import build_messages
 from prompts.task_prompts import get_prompt
 from utils.data_loader import load_test_data
 from utils.result_saver import save_results

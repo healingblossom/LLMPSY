@@ -6,10 +6,10 @@ Wie sich die Prompts zusammensetzen, ist in tasks.yaml definiert
 """
 
 # ============================================================================
-# KOMPONENTE 1: Role (Optional, Variierend)
+# KOMPONENTE: Role (Variierend)
 # ============================================================================
 
-ROLE_PSYCHIATRIST = "Du bist ein erfahrener Psychiater mit Expertise in DSM-5 Diagnostik."
+ROLE_PSYCHIATRIST = "Du bist ein erfahrener Psychiater."
 ROLE_NONE = ""
 
 ROLES = {
@@ -18,91 +18,102 @@ ROLES = {
 }
 
 # ============================================================================
-# KOMPONENTE 2: Aufgabenbeschreibung
+# KOMPONENTE: Chain-of-Thought (Optional)
 # ============================================================================
 
-TASK_EXTRACT_SYMPTOMS = (
-    "Deine Aufgabe ist es, psychiatrisch relevante Symptome aus dem folgenden Interviewtranskript zu extrahieren. "
-    "Konzentriere dich auf Symptome, die relevant für die Diagnose von Bipolaren Störungen und Schweren Depressiven Episoden sind."
+COT_ACTIVE = "Erledige die Aufgabe Schritt für Schritt und dokumentiere alles."
+
+COT = {
+    "cot": COT_ACTIVE
+}
+
+
+# ============================================================================
+# KOMPONENTE: Aufgabenbeschreibungen
+# ============================================================================
+
+TASK1_EXTRACT_SYMPTOMS = (
+    "Identifiziere psychiatrisch relevante Symptome für Major Depression Episode und Bipolare Störungen (DSM-5), und zitiere die jeweiligen Abschnitte (Wortlaute), die jedes Symptom belegen."
+)
+TASK4_SUMMARY = (
+    "Fasse den Fall des Patienten  zusammen. Verwende hierfür die  Symptome, Abschnitte und erfüllten Diagnosekriterien aus dem Input."
+    "Deine Aufgabe ist es:\
+    1. wichtige biografische Elemente zusammenzufassen\
+    2. die Symptome und erfüllte Diagnosekriterien darzustellen"
 )
 
+TASK2_DIAGNOSTIC_CRITERIA_MAPPING = ("")
+TASK3_DIAGNOSIS_PREDICTION = ("")
+
+
 TASKS = {
-    "task1_extract_symptoms": TASK_EXTRACT_SYMPTOMS,
+    "task1_extract_symptoms": TASK1_EXTRACT_SYMPTOMS,
+    "task4_summary": TASK4_SUMMARY,
+    "task2_diagnostic_criteria_mapping": TASK2_DIAGNOSTIC_CRITERIA_MAPPING,#Todo
+    "task3_diagnosis_prediction": TASK3_DIAGNOSIS_PREDICTION,#todo
 }
 
 # ============================================================================
-# KOMPONENTE 3: Output-Format
+# KOMPONENTE: Output-Format
 # ============================================================================
 
 FORMAT_SYMPTOMS_JSON = (
-    "Gib deine Antwort AUSSCHLIESSLICH als gültiges JSON-Array aus, "
-    "mit folgendem Schema: "
-    "[{'symptom': '<symptom_label>', 'section': '<exakte_zitierung_aus_text>'}, ...]"
+    "Gib deine Antwort ausschließlich in folgendem Format als gültiges JSON zurück: [{\"symptom\": \"<label>\", \"section\": \"<exact transcript quote>\"}, {\"symptom\": \"<label>\", \"section\": \"<exact transcript quote>\"}, ...].\\"
+    "Verwende ausschließlich folgende Symptome:\\"
+    "{symptom}\\"
+    "Zitiere die Abschnitte aus dem Transkript korrekt. Verändere dabei nichts. Gib nur die minimal nötigen Wörter zur Belegung des Symptoms (keine ganzen Sätze). Achte darauf, das der Inhalt verständlich ist.\\"
+    "Wenn ein Abschnitt mehrere Symptome enthält, liste sie zusammen auf: [{\"symptom\": \"symptom1, symptom2\", \"section\": \"...\"}].\\"
+    "Beziehe dich nur auf Symptome, die die Patient:in hat. Ignoriere Symptome, die die Patient:in berichtet, NICHT zu haben.\\"
+    "Wenn keine psychiatrisch relevanten Symptome vorliegen, antworte mit: [{\"symptom\": \"none\", \"section\": \"none\"}]."
 )
+
+SYMPTOME_DEPRESSIVE_EPISODE = "Depressive Symptome: Depressive Stimmung, Interessen- oder Freudeverlust, Verminderter oder gesteigerter Appetit, Gewichtsverlust oder -zunahme, Insomnie oder Hypersomnie, Psychomotorische Unruhe oder Verlangsamung, Müdigkeit oder Energieverlust, Schuld- oder Wertlosigkeitsgefühle, Konzentrations- oder Entscheidungsschwierigkeiten, Suizidalität, Psychotische Symptome"
+SYMPTOME_MANIC_EPISODE = "Hypomanische oder Manische Symptome: Gereizte oder gehobene oder expansive Stimmung, Gesteigertes Selbstwertgefühl oder Größenideen, Vermindertes Schlafbedürfnis, Gesteigertes Sprechbedürfnis oder Rededruck, Ideenflucht oder Gedankenrasen, Ablenkbarkeit, Gesteigerte zielgerichtete Aktivität oder psychomotorische Unruhe, Risikoverhalten, Psychotische Symptome"
+
+FORMAT_SUMMARY = (
+    "Die Zusammenfassung soll maximal 250 Wörtern haben.\
+    Folge diesem Format und füge die Patientenbedingten Informationen in die <Text>-Bereiche:\
+    Biografische Zusammenfassung: <Text>\
+    Symptome und Diagnosekriterien: <Text>\
+    Formuliere es prägnant, klinisch und begründe deine Überlegungen. Wenn die Hinweise unzureichend sind oder du dir unsicher bist, gib dies an.\
+    Wenn du biografische Elemente weitergibst, nutze den Konjunktiv oder Zitiere. Alle Inhalte müssen aus den Input."
+)
+
+FORMAT_DIAGNOSTIC_CRITERIA= ("{criteria}")
+CRITERIA_DEPRESSIVE_EPISODE = "" #TODO
+CRITERIA_MANIC_EPISODE = "" #TODO
+
+FORMAT_DIAGNOSIS= ("")
 
 FORMATS = {
-    "task1_extract_symptoms": FORMAT_SYMPTOMS_JSON,
+    "task1_symptom_format": FORMAT_SYMPTOMS_JSON,
+    "task4_summary_format": FORMAT_SUMMARY,
+    "task2_diagnostic_criteria_format": FORMAT_DIAGNOSTIC_CRITERIA,#TODO
+    "task3_diagnosis_format": FORMAT_DIAGNOSIS,#TODO
 }
 
-# ============================================================================
-# KOMPONENTE 4: Symptom-Liste (Auswahl)
-# ============================================================================
-
-SYMPTOM_LIST_DEPRESSION_BIPOLAR = (
-    "Wähle ausschliesslich aus folgenden Symptomen:\n\n"
-    "Schwere Depressive Episode:\n"
-    "- Depressive Stimmung\n"
-    "- Interessen- oder Freudeverlust (Anhedonie)\n"
-    "- Verminderter oder gesteigerter Appetit\n"
-    "- Gewichtsverlust oder -zunahme\n"
-    "- Insomnie oder Hypersomnie\n"
-    "- Psychomotorische Unruhe oder Verlangsamung\n"
-    "- Müdigkeit oder Energieverlust\n"
-    "- Schuld- oder Wertlosigkeitsgefühle\n"
-    "- Konzentrations- oder Entscheidungsschwierigkeiten\n"
-    "- Suizidalität\n\n"
-    "Manische oder Hypomanische Episode:\n"
-    "- Gereizte, gehobene oder expansive Stimmung\n"
-    "- Gesteigertes Selbstwertgefühl oder Größenideen\n"
-    "- Vermindertes Schlafbedürfnis\n"
-    "- Gesteigertes Sprechbedürfnis oder Rededruck\n"
-    "- Ideenflucht oder Gedankenrasen\n"
-    "- Ablenkbarkeit\n"
-    "- Gesteigerte zielgerichtete Aktivität oder psychomotorische Unruhe\n"
-    "- Risikoverhalten"
-)
-
-SYMPTOM_LISTS = {
-    "task1_extract_symptoms": SYMPTOM_LIST_DEPRESSION_BIPOLAR,
+SYMPTOMS = {
+    "depression": SYMPTOME_DEPRESSIVE_EPISODE,
+    "mania": SYMPTOME_MANIC_EPISODE,
 }
-
+CRITERIA = {
+    "depression": CRITERIA_DEPRESSIVE_EPISODE,
+    "mania": CRITERIA_MANIC_EPISODE,
+}
 # ============================================================================
-# KOMPONENTE 5: Prompt-Varianten (Zero/One/Few-Shot)
+# KOMPONENTE: Prompt-Varianten (Zero/One/Few-Shot)
 # ============================================================================
 
 EXAMPLES_NONE = ""
 
 EXAMPLES_ONESHOT = (
     "Hier ist ein Beispiel:\n\n"
-    "Beispiel-Transkript: "
-    "'Ich schlafe nachts überhaupt nicht mehr. Morgens bin ich völlig ausgelaugt und kann mich nicht konzentrieren.'\n\n"
-    "Beispiel-Output: "
-    "[{'symptom': 'Insomnie', 'section': 'schlafe nachts überhaupt nicht mehr'}, "
-    "{'symptom': 'Müdigkeit oder Energieverlust', 'section': 'völlig ausgelaugt'}]\n\n"
+    #todo beispiel fehlt
 )
 
 EXAMPLES_FEWSHOT = (
     "Hier sind mehrere Beispiele:\n\n"
-    "Beispiel 1:\n"
-    "Transkript: 'Seit zwei Wochen kann ich mich nicht mehr für meine Hobbys interessieren. "
-    "Alles fühlt sich sinnlos an.'\n"
-    "Output: [{'symptom': 'Interessen- oder Freudeverlust', 'section': 'kann ich mich nicht mehr für meine Hobbys interessieren'}, "
-    "{'symptom': 'Schuld- oder Wertlosigkeitsgefühle', 'section': 'alles fühlt sich sinnlos an'}]\n\n"
-    "Beispiel 2:\n"
-    "Transkript: 'Meine Gedanken rasen, ich rede ständig und kann einfach nicht stillsitzen.'\n"
-    "Output: [{'symptom': 'Ideenflucht oder Gedankenrasen', 'section': 'Gedanken rasen'}, "
-    "{'symptom': 'Gesteigertes Sprechbedürfnis oder Rededruck', 'section': 'rede ständig'}, "
-    "{'symptom': 'Gesteigerte zielgerichtete Aktivität oder psychomotorische Unruhe', 'section': 'kann nicht stillsitzen'}]\n\n"
+    #todo beispiele fehlen
 )
 
 EXAMPLES = {
@@ -112,7 +123,7 @@ EXAMPLES = {
 }
 
 # ============================================================================
-# KOMPONENTE 6: Input-Text (Platzhalter)
+# KOMPONENTE: Input-Text (Platzhalter)
 # ============================================================================
 
 INPUT_TRANSCRIPT = (
@@ -120,120 +131,24 @@ INPUT_TRANSCRIPT = (
     "{transcript}"
 )
 
-INPUT_FROM_PREVIOUS = (
-    "Hier sind die Ergebnisse aus der vorherigen Task:\n\n"
-    "{previous_results}"
+INPUT_FROM_TASK1 = (
+    "Das sind die Symptome:\n\n"
+    "{previous_results_task1}"
+)
+
+INPUT_FROM_TASK2 = (
+    "Das sind die Diagnosekriterien:\n\n"
+    "{previous_results_task2}"
+)
+
+INPUT_FROM_TASK3 = (
+    "Das ist die Diagnose: {previous_results_task3}"
 )
 
 INPUTS = {
     "transcript": INPUT_TRANSCRIPT,
-    "previous_results": INPUT_FROM_PREVIOUS,
+    "input_from_task1": INPUT_FROM_TASK1,
+    "input_from_task2": INPUT_FROM_TASK2,
+    "input_from_task3": INPUT_FROM_TASK3,
 }
 
-# ============================================================================
-# TASK-DEFINITIONEN: Kombiniert alle 6 Bausteine
-# ============================================================================
-
-def build_prompt(task_id, role_id, example_type, input_type="transcript"):
-    """
-    Baut einen kompletten Prompt aus Bausteinen zusammen.
-    
-    Args:
-        task_id: z.B. "task1_extract_symptoms"
-        role_id: z.B. "psychiatrist" oder "none"
-        example_type: z.B. "zeroshot", "oneshot", "fewshot"
-        input_type: z.B. "transcript" oder "previous_results"
-    
-    Returns:
-        Dict mit "system" und "user_template"
-    """
-    
-    # 1. Role
-    role = ROLES.get(role_id, "")
-    
-    # 2. Task
-    task = TASKS.get(task_id, "")
-    
-    # 3. Format
-    format_spec = FORMATS.get(task_id, "")
-    
-    # 4. Symptom-Liste (falls vorhanden)
-    symptoms = SYMPTOM_LISTS.get(task_id, "")
-    
-    # 5. Beispiele
-    examples = EXAMPLES.get(example_type, "")
-    
-    # 6. Input-Template (wird später mit Platzhaltern gefüllt)
-    input_template = INPUTS.get(input_type, "")
-    
-    # Zusammensetzen zu System-Prompt
-    system_parts = []
-    if role:
-        system_parts.append(role)
-    system_parts.append(task)
-    system_parts.append(format_spec)
-    if symptoms:
-        system_parts.append(symptoms)
-    if examples:
-        system_parts.append(examples)
-    
-    system_prompt = "\n\n".join(system_parts)
-    
-    return {
-        "system": system_prompt,
-        "user_template": input_template,
-    }
-
-# ============================================================================
-# VORDEFINIERTE PROMPT-KONFIGURATIONEN
-# ============================================================================
-
-TASK_CONFIGS = {
-    # TASK 1: Symptom-Extraktion
-    "task1_zeroshot_no_role": build_prompt(
-        "task1_extract_symptoms", "none", "zeroshot", "transcript"
-    ),
-    "task1_zeroshot_role": build_prompt(
-        "task1_extract_symptoms", "role", "zeroshot", "transcript"
-    ),
-    "task1_oneshot_no_role": build_prompt(
-        "task1_extract_symptoms", "none", "oneshot", "transcript"
-    ),
-    "task1_oneshot_role": build_prompt(
-        "task1_extract_symptoms", "role", "oneshot", "transcript"
-    ),
-    "task1_fewshot_no_role": build_prompt(
-        "task1_extract_symptoms", "none", "fewshot", "transcript"
-    ),
-    "task1_fewshot_role": build_prompt(
-        "task1_extract_symptoms", "role", "fewshot", "transcript"
-    ),
-    
-    # TASK 2: Diagnose
-    "task2_zeroshot_no_role": build_prompt(
-        "task2_diagnosis", "none", "zeroshot", "previous_results"
-    ),
-    "task2_zeroshot_role": build_prompt(
-        "task2_diagnosis", "role", "zeroshot", "previous_results"
-    ),
-    
-    # TASK 3: Severity
-    "task3_zeroshot_no_role": build_prompt(
-        "task3_severity", "none", "zeroshot", "previous_results"
-    ),
-    "task3_zeroshot_role": build_prompt(
-        "task3_severity", "role", "zeroshot", "previous_results"
-    ),
-}
-
-def get_prompt(template_id):
-    """
-    Hole eine vordefinierte Prompt-Konfiguration.
-    
-    Args:
-        template_id: z.B. "task1_zeroshot_no_role"
-    
-    Returns:
-        Dict mit "system" und "user_template"
-    """
-    return TASK_CONFIGS.get(template_id)
