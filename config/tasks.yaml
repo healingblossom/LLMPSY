@@ -8,7 +8,7 @@ tasks: # muss noch mal bearbeitet werden, insbesondere in anbetracht der MDD+BD 
         inputs: [ "transcript" ]
         output_format: ["task1_symptom_format"]
         episodes_divided: true
-        symptom_variants: [ "depression", "mania" ]
+        episode_variants: [ "depression", "mania" ]
         includes_cot: false
 
     - task_id: "task_2_diagnostic_criteria"
@@ -22,7 +22,7 @@ tasks: # muss noch mal bearbeitet werden, insbesondere in anbetracht der MDD+BD 
         inputs: [ "transcript" , "input_from_task1"]
         output_format: ["task2_diagnostic_criteria_format"]
         episodes_divided: true
-        symptom_variants: [ "depression", "mania" ]
+        episode_variants: [ "depression", "mania" ]
 
     - task_id: "task_3_diagnostic"
       description: "diagnostic of patient through diagnostic criteria"

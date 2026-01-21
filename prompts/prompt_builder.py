@@ -60,13 +60,14 @@ class ModelFormatBuilder(ABC):
 
         # Import snippet dictionaries
         from prompts.task_prompts import (
-            ROLES, COT, TASKS, SYMPTOMS, FORMATS, INPUTS, EXAMPLES
+            ROLES, COT, TASKS, FORMATS, INPUTS, EXAMPLES, SYMPTOMS, CRITERIA
         )
 
         self.roles = ROLES
         self.cot = COT
         self.tasks = TASKS
         self.symptoms = SYMPTOMS
+        self.criteria = CRITERIA
         self.formats = FORMATS
         self.inputs = INPUTS
         self.examples = EXAMPLES
@@ -118,7 +119,7 @@ class ModelFormatBuilder(ABC):
             self,
             task_id: str,
             role_type: str,
-            symptom_variant: Optional[str] = None,
+            episode_variant: Optional[str] = None,
             cot_active: bool = False
     ) -> str:
         """
@@ -139,10 +140,17 @@ class ModelFormatBuilder(ABC):
         format_key = snippet_config.get("output_format", [])[0] if snippet_config.get("output_format") else None
         format_text = self._get_snippet(self.formats, format_key) if format_key else ""
 
-        # Substitute symptom list if needed
-        if symptom_variant and "{symptoms}" in format_text:
-            symptom_list = self._get_snippet(self.symptoms, symptom_variant)
-            format_text = format_text.format(symptoms=symptom_list)
+        # Substitute episode-dependend lists if needed
+        if snippet_config.get("episodes_divided", False) and episode_variant:
+            # Für SYMPTOMS (in FORMAT_SYMPTOMS_JSON und FORMAT_SUMMARY)
+            if "{symptom}" in format_text:
+                symptom_list = self._get_snippet(self.symptoms, episode_variant)
+                format_text = format_text.replace("{symptom}", symptom_list)
+
+            # Für CRITERIA (in FORMAT_DIAGNOSTIC_CRITERIA)
+            if "{criteria}" in format_text:
+                criteria_list = self._get_snippet(self.criteria, episode_variant)  # ← NEUER ZUGRIFF
+                format_text = format_text.replace("{criteria}", criteria_list)
 
         # Combine components
         cot_text = ""
@@ -195,9 +203,6 @@ class ModelFormatBuilder(ABC):
 
         Args:
             task_id: Task to generate prompts for
-            role_variants: Override config - which ROLE variants to use
-            examples_variants: Override config - which EXAMPLES variants to use
-            symptom_variants: Override config - which SYMPTOMS to create separate prompts for
 
         Returns:
             Dict[variant_name -> PromptVariant]
@@ -214,21 +219,25 @@ class ModelFormatBuilder(ABC):
         examples_variants = snippet_config.get("examples", ["zeroshot"])
 
         if snippet_config.get("episodes_divided", False):
-            symptom_variants = snippet_config.get("symptom_variants", [None])
+            episode_variants = snippet_config.get("episode_variants", [None])
         else:
-            symptom_variants = [None]
+            episode_variants = [None]
 
         variants = {}
 
+        print(episode_variants)
+        print(examples_variants)
+        print(role_variants)
+
         for episode_type, role_type, examples_type in product(
-                symptom_variants,
+                episode_variants,
                 role_variants,
                 examples_variants
         ):
             instruction = self._build_instruction(
                 task_id=task_id,
                 role_type=role_type,
-                symptom_variant=episode_type
+                episode_variant=episode_type
             )
 
             input_template = self._build_input_template(task_id)
