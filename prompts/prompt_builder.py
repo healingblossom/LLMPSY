@@ -214,8 +214,7 @@ class ModelFormatBuilder(ABC):
         snippet_config = task_config.get("snippet_config", {})
 
         # Use provided variants, or fall back to config
-        role_variants = snippet_config.get("role", ["role"])
-
+        role_variants = snippet_config.get("role", ["none"])
         examples_variants = snippet_config.get("examples", ["zeroshot"])
 
         if snippet_config.get("episodes_divided", False):
@@ -413,3 +412,50 @@ class MistralPromptBuilder(ModelFormatBuilder):
             input_template=variant.input_template
         )
 
+
+class AlpacaPromptBuilder(ModelFormatBuilder):
+    """
+    Alpaca format builder.
+    https://github.com/tatsu-lab/alpaca
+
+    Format:
+    ```
+    Below is an instruction that describes a task, paired with an input...
+    ### Instruction: ...
+    ### Input: ...
+    ### Response:
+    ```
+    """
+
+    @property
+    def format_name(self) -> str:
+        return "alpaca"
+
+    def format_prompt(self, variant: PromptVariant) -> str:
+        """Format PromptVariant into Alpaca structure."""
+        template = """\
+Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
+
+### Instruction:
+{instruction}
+
+### Input:
+{input_template}
+
+### Response:
+"""
+        return template.format(
+            instruction=variant.instruction,
+            input_template=variant.input_template
+        )
+
+if __name__ == "__main__":
+    alpaca_builder = AlpacaPromptBuilder()
+    all_prompts = alpaca_builder.build_all_prompts()
+
+    for task_id, variants in all_prompts.items():
+        print(f"\n  Task: {task_id}")
+        print(f"    Variants: {len(variants)}")
+        for variant_name, formatted_prompt in list(variants.items())[:1]:  # Nur erste zeigen
+            print(f"      - {variant_name}")
+            print(f"        Prompt :\n{formatted_prompt}...")

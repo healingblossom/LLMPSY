@@ -1,6 +1,6 @@
 # mental_alpaca.py
 from model_manager import model
-from prompts.prompt_builder  import ModelFormatBuilder, PromptVariant
+
 from tasks_runner import run_all_tasks
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -26,42 +26,6 @@ class MentalAlpacaWrapper():
             )
         return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-class AlpacaPromptBuilder(ModelFormatBuilder):
-    """
-    Alpaca format builder.
-    https://github.com/tatsu-lab/alpaca
-
-    Format:
-    ```
-    Below is an instruction that describes a task, paired with an input...
-    ### Instruction: ...
-    ### Input: ...
-    ### Response:
-    ```
-    """
-
-    @property
-    def format_name(self) -> str:
-        return "alpaca"
-
-    def format_prompt(self, variant: PromptVariant) -> str:
-        """Format PromptVariant into Alpaca structure."""
-        template = """\
-Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
-
-### Instruction:
-{instruction}
-
-### Input:
-{input_template}
-
-### Response:
-"""
-        return template.format(
-            instruction=variant.instruction,
-            input_template=variant.input_template
-        )
-
 
 # ============================================================================
 # Tests
@@ -73,14 +37,4 @@ if __name__ == "__main__":
         selected_tasks="task_1_symptom_detection_and_sectioning",
         selected_variants=None  # Alle Varianten
     )
-
-    alpaca_builder = AlpacaPromptBuilder()
-    all_prompts = alpaca_builder.build_all_prompts()
-
-    for task_id, variants in all_prompts.items():
-        print(f"\n  Task: {task_id}")
-        print(f"    Variants: {len(variants)}")
-        for variant_name, formatted_prompt in list(variants.items())[:1]:  # Nur erste zeigen
-            print(f"      - {variant_name}")
-            print(f"        Prompt :\n{formatted_prompt}...")
 
