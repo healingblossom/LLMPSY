@@ -413,7 +413,7 @@ class InterviewDataParser:
         Beispiel:
             parser.export_diagnostic_criteria_to_json('criteria.json')
         """
-        criteria = self.get_all_diagnostic_criteria(episode_type=episode_type)
+        criteria = self.get_diagnostic_criteria(episode_type=episode_type)
 
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(criteria, f, indent=2, ensure_ascii=False)
@@ -765,7 +765,7 @@ class InterviewDataParser:
                 for time in ['aktuelle', 'frühere']:
                     if time in disorder_data:
                         episode_df = disorder_data[time]
-                        result[patient_id][time] = {}
+                        result[patient_id][disorder][time] = {}
 
                         if isinstance(episode_df, pd.DataFrame) and len(episode_df) > 0:
                             for idx, row in episode_df.iterrows():
@@ -774,12 +774,12 @@ class InterviewDataParser:
                                 relevant_section = row['relevant_section']
 
                                 if chunk not in result[patient_id][time]:
-                                    result[patient_id][time][chunk] = []
+                                    result[patient_id][disorder][time][chunk] = []
 
                                 # Erstelle Symptom-Einträge im geforderten Format
                                 if symptoms and len(symptoms) > 0:
                                     for symptom in symptoms:
-                                        result[patient_id][time][chunk].append({
+                                        result[patient_id][disorder][time][chunk].append({
                                             'symptom': symptom,
                                             'section': str(relevant_section) if pd.notna(relevant_section) else str(
                                                 row['transcript'])
@@ -787,7 +787,7 @@ class InterviewDataParser:
 
         return result
 
-    def get_all_diagnostic_criteria(self) -> Dict[str, Dict]:
+    def get_diagnostic_criteria(self) -> Dict[str, Dict]:
         """
         Gibt alle diagnostischen Kriterien für alle Patienten zurück.
 
@@ -827,7 +827,7 @@ class InterviewDataParser:
 
                 for time in times:
                     if time in criteria_data:
-                        result[patient_id][time] = criteria_data[time]
+                        result[patient_id][disorder][time] = criteria_data[time]
 
         return result
 
