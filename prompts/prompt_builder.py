@@ -39,7 +39,7 @@ class PromptVariant:
 # ABSTRACT BASE CLASS
 # ============================================================================
 
-class ModelFormatBuilder(ABC):
+class PromptBuilder():
     """
     Abstract base for model-specific prompt builders.
 
@@ -309,11 +309,33 @@ class ModelFormatBuilder(ABC):
                 json.dump(variants, f, indent=2, ensure_ascii=False)
             print(f"✓ [{self.format_name}] Saved: {output_file}")
 
+    def get_formated_prompts(self, model_name):
+
+        model_spec = self.get_model_spec(model_name)
+        format = model_spec['format']
+
+        print(f"   Format: {format}")
+
+        if format == 'alpaca':
+            return AlpacaPromptBuilder.build_all_prompts()
+
+        elif format == 'mistral':
+            return MistralPromptBuilder.build_all_prompts()
+
+        elif format == 'flan':
+            return FLANPromptBuilder.build_all_prompts()
+
+        elif format == 'openrouter':
+            return OpenRouterPromptBuilder.build_all_prompts()
+
+        else:
+            raise NotImplementedError(f"Source '{format}' nicht implementiert")
+
 
 # ============================================================================
 # FORMAT IMPLEMENTATIONS
 # ============================================================================
-class FLANPromptBuilder(ModelFormatBuilder):
+class FLANPromptBuilder(PromptBuilder):
     """
     FLAN format builder.
 
@@ -342,7 +364,7 @@ class FLANPromptBuilder(ModelFormatBuilder):
         return prompt.strip()
 
 
-class OpenRouterPromptBuilder(ModelFormatBuilder):
+class OpenRouterPromptBuilder(PromptBuilder):
     """
     OpenRouter format builder (Chat Completions API).
 
@@ -384,7 +406,7 @@ class OpenRouterPromptBuilder(ModelFormatBuilder):
         return json.dumps({"messages": messages}, indent=2, ensure_ascii=False)
 
 
-class MistralPromptBuilder(ModelFormatBuilder):
+class MistralPromptBuilder(PromptBuilder):
     """
     Mistral format builder.
 
@@ -413,7 +435,7 @@ class MistralPromptBuilder(ModelFormatBuilder):
         )
 
 
-class AlpacaPromptBuilder(ModelFormatBuilder):
+class AlpacaPromptBuilder(PromptBuilder):
     """
     Alpaca format builder.
     https://github.com/tatsu-lab/alpaca
