@@ -441,11 +441,11 @@ class InterviewDataParser:
 
         print(f"Summary exportiert zu: {output_path}")
 
-# =======================================================================
-#                   METHODEN VERWENDUNG AUẞERHALB DIERSER KLASSE
-# =======================================================================
+    # =======================================================================
+    #                   METHODEN VERWENDUNG AUẞERHALB DIESER KLASSE
+    # =======================================================================
 
-# ==================== DISPLAY & EXPORT METHODEN ====================
+    # ==================== DISPLAY & EXPORT METHODEN ====================
 
     def print_patient_transcript(self, patient_id: str, episode_type: str = None, time_frame: str = None):
         """
@@ -622,7 +622,7 @@ class InterviewDataParser:
         return export_data
 
 
-# ==================== GETTER METHODEN ====================
+    # ==================== GETTER METHODEN ====================
 
     def get_data_structure(self) -> Dict[str, Dict]:
         """
@@ -917,7 +917,7 @@ class InterviewDataParser:
 
 
 
-
+"""
 # Beispiel-Nutzung:
 if __name__ == "__main__":
     # Initialisiere Parser mit verbose mode
@@ -932,8 +932,6 @@ if __name__ == "__main__":
     # Interviewabschnitt drucken
     df = parser.get_transcripts(episode_type='depression', include_time_keys=False)["01"]["depression"]
     print(df.iloc[0]['transcript'])
-
-    """
 
     # 2. Komplettes Transkript anschauen
     parser.print_patient_transcript('01')

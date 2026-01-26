@@ -115,13 +115,7 @@ class PromptBuilder():
                 return task
         return None
 
-    def _build_instruction(
-            self,
-            task_id: str,
-            role_type: str,
-            episode_variant: Optional[str] = None,
-            cot_active: bool = False
-    ) -> str:
+    def _build_instruction( self, task_id: str, role_type: str, episode_variant: Optional[str] = None) -> str:
         """
         Assemble instruction from role + (cot) + task + format + symptoms.
 
@@ -191,10 +185,7 @@ class PromptBuilder():
         ]
         return "\n\n".join(input_parts)
 
-    def generate_variants_for_task(
-            self,
-            task_id: str
-    ) -> Dict[str, PromptVariant]:
+    def generate_variants_for_task( self, task_id: str) -> Dict[str, PromptVariant]:
         """
         Generate all prompt permutations for a single task.
 
@@ -283,12 +274,7 @@ class PromptBuilder():
 
         return all_prompts
 
-    def save_prompts(
-            self,
-            prompts: Dict[str, Dict[str, str]],
-            output_dir: str = "./prompts/",
-            output_format: str = "json"
-    ) -> None:
+    def save_prompts( self, prompts: Dict[str, Dict[str, str]], output_dir: str = "./prompts/") -> None:
         """
         Save generated prompts to files.
 
@@ -333,7 +319,7 @@ class PromptBuilder():
 
 
 # ============================================================================
-# FORMAT IMPLEMENTATIONS
+# FORMAT IMPLEMENTATIONS (BITTE DIESE KLASSEN VERWENDEN ZUM ARBEITEN)
 # ============================================================================
 class FLANPromptBuilder(PromptBuilder):
     """
@@ -471,6 +457,8 @@ Below is an instruction that describes a task, paired with an input that provide
             input_template=variant.input_template
         )
 
+"""
+# Beispiel-Nutzung:
 if __name__ == "__main__":
     alpaca_builder = AlpacaPromptBuilder()
     all_prompts = alpaca_builder.build_all_prompts()
@@ -481,3 +469,4 @@ if __name__ == "__main__":
         for variant_name, formatted_prompt in list(variants.items())[:1]:  # Nur erste zeigen
             print(f"      - {variant_name}")
             print(f"        Prompt :\n{formatted_prompt}...")
+#"""
