@@ -68,7 +68,7 @@ class ModelManager:
         if model_name == "mental_alpaca":
             return MentalAlpacaWrapper()
         elif model_name == "mistral":
-            return MistralWrapper(model_path)# Wrapper not done yet, look into the MentalAlpacaWrapper for inspo
+            return MistralWrapper(model_path)#todo Wrapper not done yet, look into the MentalAlpacaWrapper for inspo
         else:
             raise ValueError(f"Unbekanntes Modell: {model_name}")
     
@@ -95,27 +95,3 @@ class ModelManager:
                 print(f"   Pfad existiert nicht: {model_path}")
 
 
-# TESTING: Wenn direkt ausgeführt
-if __name__ == '__main__':
-    print("="*60)
-    print("Teste ModelManager")
-    print("="*60)
-    
-    try:
-        # 1. Initialisiere
-        manager = ModelManager('config.yaml')
-        
-        # 2. Lade Modell
-        model = manager.load_model('mistral')
-        print("\nModell erfolgreich geladen")
-        print(f"   Model Object: {model}")
-        
-        # 3. Cleanup
-        manager.cleanup_model('mistral')
-        print("\nCleanup erfolgreich")
-        
-    except Exception as e:
-        print("\nFehler:")
-        print(e)
-        import traceback
-        traceback.print_exc()

@@ -7,8 +7,8 @@ import yaml
 
 with open("config.yaml") as f:
     config = yaml.safe_load(f)
-CONDA_ENVS_ROOT = config['paths']['proj_directory']
-PROJECT_ROOT = config['paths']['conda_env_directory']
+CONDA_ENVS_ROOT = config['paths']['conda_env_directory']
+PROJECT_ROOT = config['paths']['proj_directory']
 
 
 def run_in_conda_env(env_name, python_script, script_args=None):
@@ -37,8 +37,6 @@ def run_in_conda_env(env_name, python_script, script_args=None):
     ] + script_args
 
     print(f"\nStarte Script in Environment (Prefix): {env_prefix}")
-    print(f"   Script: {python_script}")
-    print(f"   Command: {' '.join(cmd)}\n")
 
     result = subprocess.run(cmd)
 
