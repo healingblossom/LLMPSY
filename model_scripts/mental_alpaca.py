@@ -1,7 +1,9 @@
 # mental_alpaca.py
-from model_manager import model
 
-from tasks_runner import run_all_tasks
+from prompts.prompt_builder import AlpacaPromptBuilder
+from run_in_env import run_in_conda_env
+
+import tasks_runner
 
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
@@ -32,9 +34,5 @@ class MentalAlpacaWrapper():
 # ============================================================================
 
 if __name__ == "__main__":
-    run_all_tasks(
-        model_name="mental_alpaca",
-        selected_tasks="task_1_symptom_detection_and_sectioning",
-        selected_variants=None  # Alle Varianten
-    )
+    run_in_conda_env("mental_alpaca", tasks_runner.py, script_args=[] )
 
