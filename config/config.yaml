@@ -8,12 +8,14 @@ paths:
 models: #legende: Modellnamen klein geschrieben
     - name: "mistral"
       source: "hpc"
+      format: "mistral"
       conda_env: "gpulab_env" 
       path: "/sc-resources/llms/mistralai/Mistral-7B-Instruct-v0.3"
       description: "ein LLM das schon vom HPC eingerichtet wurde, zum start"
 
     - name: "mental_alpaca"
       source: "local_download"
+      format: "alpaca"
       conda_env: "mentalalpaca_env"
       path: "/sc-scratch/sc-scratch-dhzc-psycho/data/models/mental-alpaca"
       description: "das MentalAlpaca LLM, das in einem Paper entstanden auf einen Mental-Health Social-Mediabeiträge Datensatz gefinetuned wurde"
@@ -21,4 +23,3 @@ models: #legende: Modellnamen klein geschrieben
 logging: # anscheinend stellt das ein, wie viel geloggt wird von den Fehlermeldungen/Warnings während des laufens, musst du dann sehen
   level: "INFO"
   log_file: "evaluation.log"
-  
