@@ -27,7 +27,8 @@ class InterviewDataParser:
     def _log(self, message: str):
         """Hilfsmethod für Logging"""
         if self.verbose:
-            print(f"[DEBUG] {message}")
+            #print(f"[DEBUG] {message}")
+            pass
 
     # ==================== PARSING METHODEN ====================
 
@@ -231,7 +232,7 @@ class InterviewDataParser:
 
         return episode_df, diagnostic_criteria, current_row
 
-    def _parse_overall_summary(self, df: pd.DataFrame, row_idx: int) -> Dict[str, any]:
+    def _parse_overall_diagnostic_lines(self, df: pd.DataFrame, row_idx: int) -> Dict[str, any]:
         """
         Parst die Zusammenfassung am Ende einer Interview-Tabelle.
         """
@@ -284,7 +285,7 @@ class InterviewDataParser:
 
         return summary
 
-    def _find_summary_row(self, df: pd.DataFrame, start_from: int = 0) -> int:
+    def _find_overall_diagnostic_lines_row(self, df: pd.DataFrame, start_from: int = 0) -> int:
         """
         Findet die Zeile mit der Zusammenfassung (Verdachtsdiagnose, etc.).
         """
@@ -323,7 +324,7 @@ class InterviewDataParser:
         }
 
         # Finde zuerst die Summary-Zeile um zu wissen wo sie ist
-        summary_row = self._find_summary_row(df)
+        summary_row = self._find_overall_diagnostic_lines_row(df)
         self._log(f"Summary-Zeile gefunden bei: {summary_row}")
 
         while current_row < len(df):
@@ -350,7 +351,7 @@ class InterviewDataParser:
                 # Prüfe ob wir bei der Summary-Zeile sind
                 if summary_row != -1 and current_row == summary_row:
                     self._log(f"Zeile {current_row}: Summary-Zeile gefunden")
-                    patient_data['insgesammt'] = self._parse_overall_summary(df, current_row)
+                    patient_data['insgesammt'] = self._parse_overall_diagnostic_lines(df, current_row)
                     self._log(f"  Summary geparst: {patient_data['insgesammt']}")
                     break
 
@@ -371,13 +372,80 @@ class InterviewDataParser:
 
         return self.data_structure
 
-    def get_data_structure(self) -> Dict[str, Dict]:
-        """
-        Gibt die geparste Datenstruktur zurück.
-        """
-        return self.data_structure
+    # ==================== HILFSMETHODEN FÜR EXPORT ====================
 
-    # ==================== DISPLAY & EXPORT METHODEN ====================
+    def export_symptoms_to_json(self, output_path: str, episode_type: Optional[str] = None):
+        """
+        Exportiert Symptome im geforderten Format zu JSON.
+
+        Args:
+            output_path: Pfad zur Ausgabe-Datei
+            episode_type: Optional - 'depression' oder 'mania'
+
+        Beispiel:
+            parser.export_symptoms_to_json('symptoms.json', episode_type='depression')
+        """
+        symptoms = self.get_symptoms(episode_type=episode_type)
+
+        # Konvertiere zu JSON-kompatiblem Format
+        json_data = {}
+        for patient_id, disorders in symptoms.items():
+            json_data[patient_id] = {}
+            for disorder, times in disorders.items():
+                json_data[patient_id] = {}
+                for time, chunks in times.items():
+                    json_data[patient_id][time] = chunks
+
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(json_data, f, indent=2, ensure_ascii=False)
+
+        print(f"Symptome exportiert zu: {output_path}")
+
+
+    def export_diagnostic_criteria_to_json(self, output_path: str, episode_type: Optional[str] = None):
+        """
+        Exportiert diagnostische Kriterien zu JSON.
+
+        Args:
+            output_path: Pfad zur Ausgabe-Datei
+            episode_type: Optional - 'depression' oder 'mania'
+
+        Beispiel:
+            parser.export_diagnostic_criteria_to_json('criteria.json')
+        """
+        criteria = self.get_all_diagnostic_criteria(episode_type=episode_type)
+
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(criteria, f, indent=2, ensure_ascii=False)
+
+        print(f"Diagnostische Kriterien exportiert zu: {output_path}")
+
+
+    def export_summary_to_csv(self, output_path: str, groups: Optional[List[str]] = None, patient_ids: Optional[List[str]] = None):
+        """
+        Exportiert Summary-Daten zu CSV.
+
+        Args:
+            output_path: Pfad zur Ausgabe-Datei
+            groups: Optional - Liste der Gruppen
+            patient_ids: Optional - Liste der Patient-IDs
+
+        Beispiel:
+            parser.export_summary_to_csv('summary.csv')
+        """
+        summary = self.get_summary_data(groups=groups, patient_ids=patient_ids)
+
+        # Konvertiere zu DataFrame
+        df = pd.DataFrame(summary)
+        df.to_csv(output_path, encoding='utf-8', index_label='Patient ID')
+
+        print(f"Summary exportiert zu: {output_path}")
+
+# =======================================================================
+#                   METHODEN VERWENDUNG AUẞERHALB DIERSER KLASSE
+# =======================================================================
+
+# ==================== DISPLAY & EXPORT METHODEN ====================
 
     def print_patient_transcript(self, patient_id: str, episode_type: str = None, time_frame: str = None):
         """
@@ -396,13 +464,12 @@ class InterviewDataParser:
 
         patient_data = self.data_structure[patient_id]
 
-        print(f"\n{'=' * 80}")
         print(f"PATIENT {patient_id}")
         print(f"{'=' * 80}")
 
         # Zeige Zusammenfassung
         summary = patient_data['insgesammt']
-        print(f"\n📋 ZUSAMMENFASSUNG:")
+        print(f"\n ZUSAMMENFASSUNG:")
         print(f"  Verdachtsdiagnose: {summary.get('Verdachtsdiagnose')}")
         print(f"  Differentialdiagnosen: {summary.get('Notwendige Differentialdiagnosen')}")
         print(f"  Komorbiditäten: {summary.get('Komorbiditäten')}")
@@ -431,25 +498,24 @@ class InterviewDataParser:
             disorder_name = "Depression" if disorder == "depression" else "Manie/Hypomanie"
             time_name = "Aktuelle" if time == "aktuelle" else "Frühere"
 
-            print(f"\n{'─' * 80}")
-            print(f"🔹 {time_name} {disorder_name.upper()}")
+            print(f" {time_name} {disorder_name.upper()}")
             print(f"{'─' * 80}")
 
             # Zeige diagnostische Kriterien
-            print(f"\n  ✓ Erfüllte Kriterien:")
+            print(f"\n Erfüllte Kriterien:")
             for criterion in criteria.get('erfüllte Kriterien', []):
                 print(f"    • {criterion}")
 
-            print(f"\n  ✗ Nicht erfüllte Kriterien:")
+            print(f"\n Nicht erfüllte Kriterien:")
             for criterion in criteria.get('nicht erfüllte Kriterien', []):
                 print(f"    • {criterion}")
 
-            print(f"\n  ? Unbekannte Kriterien:")
+            print(f"\n Unbekannte Kriterien:")
             for criterion in criteria.get('unbekannte Kriterien', []):
                 print(f"    • {criterion}")
 
             # Zeige Transkript
-            print(f"\n  📝 TRANSKRIPT ({len(episode_df)} Chunks):")
+            print(f"\n TRANSKRIPT ({len(episode_df)} Chunks):")
             print(f"  {'-' * 76}")
 
             for idx, row in episode_df.iterrows():
@@ -469,12 +535,11 @@ class InterviewDataParser:
                         print(f"    {transcript_text}")
 
                 if pd.notna(relevant) and str(relevant).strip():
-                    print(f"    💭 Relevant: {str(relevant)}")
+                    print(f" Relevant: {str(relevant)}")
 
                 if symptoms and len(symptoms) > 0:
-                    print(f"    🔍 Symptome: {', '.join(symptoms)}")
+                    print(f" Symptome: {', '.join(symptoms)}")
 
-            print(f"  {'-' * 76}")
 
     def print_patient_structure(self, patient_id: str):
         """
@@ -486,9 +551,7 @@ class InterviewDataParser:
 
         patient_data = self.data_structure[patient_id]
 
-        print(f"\n{'=' * 60}")
         print(f"STRUKTUR PATIENT {patient_id}")
-        print(f"{'=' * 60}")
 
         # Zusammenfassung
         print(f"\n📋 insgesammt:")
@@ -545,10 +608,10 @@ class InterviewDataParser:
 
             for time in ['aktuelle', 'frühere']:
                 if time in disorder_data and isinstance(disorder_data[time], pd.DataFrame):
-                    export_data['interviews'][disorder][time] = disorder_data[time].to_dict('records')
+                    export_data['interviews'][time] = disorder_data[time].to_dict('records')
 
             if 'Diagnostische Kriterien' in disorder_data:
-                export_data['interviews'][disorder]['Diagnostische Kriterien'] = disorder_data[
+                export_data['interviews']['Diagnostische Kriterien'] = disorder_data[
                     'Diagnostische Kriterien']
 
         if output_path:
@@ -558,504 +621,303 @@ class InterviewDataParser:
 
         return export_data
 
-    def save_to_pickle(self, output_path: str):
-        """
-        Speichert die Datenstruktur als Pickle-Datei.
-        """
-        import pickle
-        with open(output_path, 'wb') as f:
-            pickle.dump(self.data_structure, f)
-        print(f"Datenstruktur gespeichert in {output_path}")
-
-    def load_from_pickle(self, input_path: str):
-        """
-        Lädt die Datenstruktur aus einer Pickle-Datei.
-        """
-        import pickle
-        with open(input_path, 'rb') as f:
-            self.data_structure = pickle.load(f)
-        print(f"Datenstruktur geladen aus {input_path}")
-
 
 # ==================== GETTER METHODEN ====================
 
-def get_all_transcripts(self, episode_type: Optional[str] = None) -> Dict[str, Dict]:
-    """
-    Gibt alle Patienten-Transkripte gruppiert nach:
-    Patient → Episodentyp (depression/mania) → Einzelne Episoden (aktuelle/frühere)
+    def get_data_structure(self) -> Dict[str, Dict]:
+        """
+        Gibt die geparste Datenstruktur zurück.
+        """
+        return self.data_structure
 
-    Args:
-        episode_type: Optional - 'depression' oder 'mania' zum Filtern
-                     Wenn None, werden alle zurückgegeben
+    def get_transcripts(self, episode_type: Optional[str] = None, include_time_keys: bool = True) -> Dict[str, Dict]:
+        """
+        Gibt alle Patienten-Transkripte gruppiert nach:
+        Patient → Episodentyp (depression/mania) → Einzelne Episoden (aktuelle/frühere)
 
-    Returns:
-        {
-            'patient_01': {
-                'depression': {
-                    'aktuelle': pd.DataFrame,
-                    'frühere': pd.DataFrame
+        Args:
+            episode_type: Optional - 'depression' oder 'mania' zum Filtern
+                         Wenn None, werden alle zurückgegeben
+
+        Returns:
+            {
+                'patient_01': {
+                    'depression': {
+                        'aktuelle': pd.DataFrame,
+                        'frühere': pd.DataFrame
+                    },
+                    'mania': {
+                        'aktuelle': pd.DataFrame,
+                        'frühere': pd.DataFrame
+                    }
                 },
-                'mania': {
-                    'aktuelle': pd.DataFrame,
-                    'frühere': pd.DataFrame
-                }
-            },
-            ...
-        }
+                ...
+            }
 
-    Beispiel:
-        # Alle Transkripte
-        all_transcripts = parser.get_all_transcripts()
+        Beispiel:
+            # Alle Transkripte
+            all_transcripts = parser.get_all_transcripts()
 
-        # Nur Depression
-        dep_transcripts = parser.get_all_transcripts(episode_type='depression')
-    """
-    result = {}
+            # Nur Depression
+            dep_transcripts = parser.get_all_transcripts(episode_type='depression')
+        """
+        if episode_type not in ['depression', 'mania', None]:
+            raise ValueError(f"episode_type muss 'depression', 'mania' oder None sein, nicht '{episode_type}'")
 
-    for patient_id, patient_data in self.data_structure.items():
-        result[patient_id] = {}
+        result = {}
 
-        for disorder in ['depression', 'mania']:
-            # Filter nach episode_type wenn gesetzt
-            if episode_type and episode_type != disorder:
-                continue
-
-            disorder_data = patient_data['interviews'].get(disorder, {})
-            result[patient_id][disorder] = {}
-
-            for time in ['aktuelle', 'frühere']:
-                if time in disorder_data:
-                    result[patient_id][disorder][time] = disorder_data[time]
-
-    return result
-
-
-def get_transcripts_by_episode_type(self, episode_type: str) -> Dict[str, Dict]:
-    """
-    Gibt Transkripte für einen spezifischen Episodentyp zurück.
-
-    Args:
-        episode_type: 'depression' oder 'mania'
-
-    Returns:
-        {
-            'patient_01': {
-                'aktuelle': pd.DataFrame,
-                'frühere': pd.DataFrame
-            },
-            'patient_02': {
-                'aktuelle': pd.DataFrame,
-                'frühere': pd.DataFrame
-            },
-            ...
-        }
-
-    Beispiel:
-        depression_transcripts = parser.get_transcripts_by_episode_type('depression')
-    """
-    if episode_type not in ['depression', 'mania']:
-        raise ValueError(f"episode_type muss 'depression' oder 'mania' sein, nicht '{episode_type}'")
-
-    result = {}
-
-    for patient_id, patient_data in self.data_structure.items():
-        disorder_data = patient_data['interviews'].get(episode_type, {})
-
-        if disorder_data:
+        for patient_id, patient_data in self.data_structure.items():
             result[patient_id] = {}
 
-            for time in ['aktuelle', 'frühere']:
-                if time in disorder_data:
-                    result[patient_id][time] = disorder_data[time]
+            for disorder in ['depression', 'mania']:
+                # Filter nach episode_type wenn gesetzt
+                if episode_type and episode_type != disorder:
+                    continue
 
-    return result
+                disorder_data = patient_data['interviews'].get(disorder, {})
+
+                if not disorder_data:
+                    continue
+
+                if include_time_keys:
+                    # Mit Zeit-Keys: 'aktuelle' / 'frühere'
+                    result[patient_id][disorder] = {}
+
+                    for time in ['aktuelle', 'frühere']:
+                        if time in disorder_data:
+                            df = disorder_data[time].copy()
+
+                            # Entferne symptoms-Spalte wenn gewünscht
+                            df = df.drop(columns=['relevant_section'])
+                            df = df.drop(columns=['symptoms'])
+                            df = df.drop(columns=['chunk'])
+
+                            result[patient_id][disorder][time] = df
+
+                else:
+                    # Ohne Zeit-Keys: DataFrame kombinieren
+                    dfs_to_concat = []
+
+                    for time in ['aktuelle', 'frühere']:
+                        if time in disorder_data:
+                            df = disorder_data[time].copy()
+
+                            # Entferne symptoms-Spalte wenn gewünscht
+                            df = df.drop(columns=['relevant_section'])
+                            df = df.drop(columns=['symptoms'])
+                            df = df.drop(columns=['chunk'])
+
+                            dfs_to_concat.append(df)
+
+                    if dfs_to_concat:
+                        combined_df = pd.concat(dfs_to_concat, ignore_index=True)
+                        result[patient_id][disorder] = combined_df
+
+        return result
 
 
-def get_all_symptoms(self, episode_type: Optional[str] = None) -> Dict[
-    str, Dict[str, Dict[str, Dict[str, List[Dict]]]]]:
-    """
-    Gibt alle Symptome für alle Patienten mit markierten Textstellen.
+    def get_symptoms(self, episode_type: Optional[str] = None) -> Dict[str, Dict[str, Dict[str, Dict[str, List[Dict]]]]]:
+        """
+        Gibt alle Symptome für alle Patienten mit markierten Textstellen.
 
-    Args:
-        episode_type: Optional - 'depression' oder 'mania' zum Filtern
+        Args:
+            episode_type: Optional - 'depression' oder 'mania' zum Filtern
 
-    Returns:
-        {
-            'patient_01': {
-                'depression': {
-                    'aktuelle': {
-                        'chunk_1': [
-                            {'symptom': 'Schlaflosigkeit', 'section': 'Ich kann nachts nicht schlafen...'},
-                            {'symptom': 'Traurigkeit', 'section': 'Ich fühle mich sehr traurig...'}
-                        ],
-                        'chunk_2': [...]
+        Returns:
+            {
+                'patient_01': {
+                    'depression': {
+                        'aktuelle': {
+                            'chunk_1': [
+                                {'symptom': 'Schlaflosigkeit', 'section': 'Ich kann nachts nicht schlafen...'},
+                                {'symptom': 'Traurigkeit', 'section': 'Ich fühle mich sehr traurig...'}
+                            ],
+                            'chunk_2': [...]
+                        },
+                        'frühere': {...}
                     },
-                    'frühere': {...}
+                    'mania': {...}
                 },
-                'mania': {...}
-            },
-            ...
-        }
+                ...
+            }
 
-    Beispiel:
-        all_symptoms = parser.get_all_symptoms()
+        Beispiel:
+            all_symptoms = parser.get_all_symptoms()
 
-        # Nur Depression-Symptome
-        dep_symptoms = parser.get_all_symptoms(episode_type='depression')
-    """
-    result = {}
+            # Nur Depression-Symptome
+            dep_symptoms = parser.get_all_symptoms(episode_type='depression')
+        """
+        if episode_type not in ['depression', 'mania', None]:
+            raise ValueError(f"episode_type muss 'depression' oder 'mania' sein, nicht '{episode_type}'")
 
-    for patient_id, patient_data in self.data_structure.items():
-        result[patient_id] = {}
+        result = {}
 
-        for disorder in ['depression', 'mania']:
-            if episode_type and episode_type != disorder:
-                continue
-
-            result[patient_id][disorder] = {}
-            disorder_data = patient_data['interviews'].get(disorder, {})
-
-            for time in ['aktuelle', 'frühere']:
-                if time in disorder_data:
-                    episode_df = disorder_data[time]
-                    result[patient_id][disorder][time] = {}
-
-                    if isinstance(episode_df, pd.DataFrame) and len(episode_df) > 0:
-                        for idx, row in episode_df.iterrows():
-                            chunk = row['chunk']
-                            symptoms = row['symptoms']
-                            relevant_section = row['relevant_section']
-
-                            if chunk not in result[patient_id][disorder][time]:
-                                result[patient_id][disorder][time][chunk] = []
-
-                            # Erstelle Symptom-Einträge im geforderten Format
-                            if symptoms and len(symptoms) > 0:
-                                for symptom in symptoms:
-                                    result[patient_id][disorder][time][chunk].append({
-                                        'symptom': symptom,
-                                        'section': str(relevant_section) if pd.notna(relevant_section) else str(
-                                            row['transcript'])
-                                    })
-
-    return result
-
-
-def get_symptoms_by_episode_type(self, episode_type: str) -> Dict[str, Dict[str, Dict[str, List[Dict]]]]:
-    """
-    Gibt Symptome für einen spezifischen Episodentyp zurück.
-
-    Args:
-        episode_type: 'depression' oder 'mania'
-
-    Returns:
-        {
-            'patient_01': {
-                'aktuelle': {
-                    'chunk_1': [
-                        {'symptom': 'Schlaflosigkeit', 'section': '...'},
-                        {'symptom': 'Traurigkeit', 'section': '...'}
-                    ],
-                    'chunk_2': [...]
-                },
-                'frühere': {...}
-            },
-            ...
-        }
-
-    Beispiel:
-        mania_symptoms = parser.get_symptoms_by_episode_type('mania')
-    """
-    if episode_type not in ['depression', 'mania']:
-        raise ValueError(f"episode_type muss 'depression' oder 'mania' sein, nicht '{episode_type}'")
-
-    result = {}
-
-    for patient_id, patient_data in self.data_structure.items():
-        result[patient_id] = {}
-        disorder_data = patient_data['interviews'].get(episode_type, {})
-
-        for time in ['aktuelle', 'frühere']:
-            if time in disorder_data:
-                episode_df = disorder_data[time]
-                result[patient_id][time] = {}
-
-                if isinstance(episode_df, pd.DataFrame) and len(episode_df) > 0:
-                    for idx, row in episode_df.iterrows():
-                        chunk = row['chunk']
-                        symptoms = row['symptoms']
-                        relevant_section = row['relevant_section']
-
-                        if chunk not in result[patient_id][time]:
-                            result[patient_id][time][chunk] = []
-
-                        if symptoms and len(symptoms) > 0:
-                            for symptom in symptoms:
-                                result[patient_id][time][chunk].append({
-                                    'symptom': symptom,
-                                    'section': str(relevant_section) if pd.notna(relevant_section) else str(
-                                        row['transcript'])
-                                })
-
-    return result
-
-
-def get_all_diagnostic_criteria(self, episode_type: Optional[str] = None,
-                                sort_current_first: bool = True) -> Dict[str, Dict]:
-    """
-    Gibt alle diagnostischen Kriterien für alle Patienten zurück.
-
-    Args:
-        episode_type: Optional - 'depression' oder 'mania' zum Filtern
-        sort_current_first: Wenn True, werden aktuelle Episoden vor früheren gezeigt
-
-    Returns:
-        {
-            'patient_01': {
-                'depression': {
-                    'aktuelle': {
-                        'erfüllte Kriterien': ['Kriterium 1', 'Kriterium 2'],
-                        'nicht erfüllte Kriterien': ['Kriterium 3'],
-                        'unbekannte Kriterien': []
-                    },
-                    'frühere': {...}
-                },
-                'mania': {...}
-            },
-            ...
-        }
-
-    Beispiel:
-        all_criteria = parser.get_all_diagnostic_criteria()
-
-        # Nur Depression
-        dep_criteria = parser.get_all_diagnostic_criteria(episode_type='depression')
-    """
-    result = {}
-
-    for patient_id, patient_data in self.data_structure.items():
-        result[patient_id] = {}
-
-        for disorder in ['depression', 'mania']:
-            if episode_type and episode_type != disorder:
-                continue
-
-            result[patient_id][disorder] = {}
-            disorder_data = patient_data['interviews'].get(disorder, {})
-            criteria_data = disorder_data.get('Diagnostische Kriterien', {})
-
-            # Sortiere Zeitrahmen (aktuelle zuerst wenn gewünscht)
-            times = ['aktuelle', 'frühere'] if sort_current_first else ['frühere', 'aktuelle']
-
-            for time in times:
-                if time in criteria_data:
-                    result[patient_id][disorder][time] = criteria_data[time]
-
-    return result
-
-
-def get_diagnostic_criteria_by_episode_type(self, episode_type: str,
-                                            sort_current_first: bool = True) -> Dict[str, Dict]:
-    """
-    Gibt diagnostische Kriterien für einen spezifischen Episodentyp zurück.
-
-    Args:
-        episode_type: 'depression' oder 'mania'
-        sort_current_first: Wenn True, werden aktuelle Episoden vor früheren gezeigt
-
-    Returns:
-        {
-            'patient_01': {
-                'aktuelle': {
-                    'erfüllte Kriterien': [...],
-                    'nicht erfüllte Kriterien': [...],
-                    'unbekannte Kriterien': [...]
-                },
-                'frühere': {...}
-            },
-            ...
-        }
-
-    Beispiel:
-        mania_criteria = parser.get_diagnostic_criteria_by_episode_type('mania')
-    """
-    if episode_type not in ['depression', 'mania']:
-        raise ValueError(f"episode_type muss 'depression' oder 'mania' sein, nicht '{episode_type}'")
-
-    result = {}
-
-    for patient_id, patient_data in self.data_structure.items():
-        disorder_data = patient_data['interviews'].get(episode_type, {})
-        criteria_data = disorder_data.get('Diagnostische Kriterien', {})
-
-        if criteria_data:
-            times = ['aktuelle', 'frühere'] if sort_current_first else ['frühere', 'aktuelle']
+        for patient_id, patient_data in self.data_structure.items():
             result[patient_id] = {}
 
-            for time in times:
-                if time in criteria_data:
-                    result[patient_id][time] = criteria_data[time]
+            for disorder in ['depression', 'mania']:
+                if episode_type and episode_type != disorder:
+                    continue
 
-    return result
+                result[patient_id] = {}
+                disorder_data = patient_data['interviews'].get(disorder, {})
 
+                for time in ['aktuelle', 'frühere']:
+                    if time in disorder_data:
+                        episode_df = disorder_data[time]
+                        result[patient_id][time] = {}
 
-def get_summary_data(self, groups: Optional[List[str]] = None,
-                     patient_ids: Optional[List[str]] = None) -> Dict[str, Dict]:
-    """
-    Gibt die Zusammenfassungs-Inhalte gruppiert nach Spalten zurück.
+                        if isinstance(episode_df, pd.DataFrame) and len(episode_df) > 0:
+                            for idx, row in episode_df.iterrows():
+                                chunk = row['chunk']
+                                symptoms = row['symptoms']
+                                relevant_section = row['relevant_section']
 
-    Args:
-        groups: Liste der gewünschten Gruppen/Spalten. Wenn None, alle zurückgeben.
-               Mögliche Werte:
-               - 'Verdachtsdiagnose'
-               - 'Notwendige Differentialdiagnosen'
-               - 'Komorbiditäten'
-               - 'Komplexität des Interviews'
-               - 'Sicherheit der Verdachtsdiagnose'
+                                if chunk not in result[patient_id][time]:
+                                    result[patient_id][time][chunk] = []
 
-        patient_ids: Liste von Patient-IDs zum Filtern. Wenn None, alle zurückgeben.
+                                # Erstelle Symptom-Einträge im geforderten Format
+                                if symptoms and len(symptoms) > 0:
+                                    for symptom in symptoms:
+                                        result[patient_id][time][chunk].append({
+                                            'symptom': symptom,
+                                            'section': str(relevant_section) if pd.notna(relevant_section) else str(
+                                                row['transcript'])
+                                        })
 
-    Returns:
-        {
-            'Verdachtsdiagnose': {
-                'patient_01': 'Bipolare Störung Typ I',
-                'patient_02': 'Bipolare Störung Typ II',
+        return result
+
+    def get_all_diagnostic_criteria(self) -> Dict[str, Dict]:
+        """
+        Gibt alle diagnostischen Kriterien für alle Patienten zurück.
+
+        Returns:
+            {
+                'patient_01': {
+                    'depression': {
+                        'aktuelle': {
+                            'erfüllte Kriterien': ['Kriterium 1', 'Kriterium 2'],
+                            'nicht erfüllte Kriterien': ['Kriterium 3'],
+                            'unbekannte Kriterien': []
+                        },
+                        'frühere': {...}
+                    },
+                    'mania': {...}
+                },
                 ...
-            },
-            'Notwendige Differentialdiagnosen': {
-                'patient_01': 'Depression, Angststörung',
+            }
+
+        Beispiel:
+            all_criteria = parser.get_all_diagnostic_criteria()
+
+            # Nur Depression
+            dep_criteria = parser.get_all_diagnostic_criteria(episode_type='depression')
+        """
+        result = {}
+
+        for patient_id, patient_data in self.data_structure.items():
+            result[patient_id] = {}
+
+            for disorder in ['depression', 'mania']:
+                result[patient_id] = {}
+                disorder_data = patient_data['interviews'].get(disorder, {})
+                criteria_data = disorder_data.get('Diagnostische Kriterien', {})
+
+                times = ['aktuelle', 'frühere']
+
+                for time in times:
+                    if time in criteria_data:
+                        result[patient_id][time] = criteria_data[time]
+
+        return result
+
+    def get_summary_data(self, groups: Optional[List[str]] = None, patient_ids: Optional[List[str]] = None) -> Dict[str, Dict]:
+        """
+        Gibt die Zusammenfassungs-Inhalte gruppiert nach Spalten zurück.
+
+        Args:
+            groups: Liste der gewünschten Gruppen/Spalten. Wenn None, alle zurückgeben.
+                   Mögliche Werte:
+                   - 'Verdachtsdiagnose'
+                   - 'Notwendige Differentialdiagnosen'
+                   - 'Komorbiditäten'
+                   - 'Komplexität des Interviews'
+                   - 'Sicherheit der Verdachtsdiagnose'
+
+            patient_ids: Liste von Patient-IDs zum Filtern. Wenn None, alle zurückgeben.
+
+        Returns:
+            {
+                'Verdachtsdiagnose': {
+                    'patient_01': 'Bipolare Störung Typ I',
+                    'patient_02': 'Bipolare Störung Typ II',
+                    ...
+                },
+                'Notwendige Differentialdiagnosen': {
+                    'patient_01': 'Depression, Angststörung',
+                    ...
+                },
                 ...
-            },
-            ...
-        }
+            }
 
-    Beispiel:
-        # Alle Summary-Daten
-        all_summary = parser.get_summary_data()
+        Beispiel:
+            # Alle Summary-Daten
+            all_summary = parser.get_summary_data()
 
-        # Nur bestimmte Spalten
-        diagnoses = parser.get_summary_data(groups=['Verdachtsdiagnose', 'Notwendige Differentialdiagnosen'])
+            # Nur bestimmte Spalten
+            diagnoses = parser.get_summary_data(groups=['Verdachtsdiagnose', 'Notwendige Differentialdiagnosen'])
 
-        # Nur bestimmte Patienten
-        selected = parser.get_summary_data(patient_ids=['01', '02', '03'])
+            # Nur bestimmte Patienten
+            selected = parser.get_summary_data(patient_ids=['01', '02', '03'])
 
-        # Kombination
-        filtered = parser.get_summary_data(
-            groups=['Verdachtsdiagnose', 'Komplexität des Interviews'],
-            patient_ids=['01', '02']
-        )
-    """
-    # Definiere alle möglichen Gruppen
-    all_groups = [
-        'Verdachtsdiagnose',
-        'Notwendige Differentialdiagnosen',
-        'Komorbiditäten',
-        'Komplexität des Interviews',
-        'Sicherheit der Verdachtsdiagnose'
-    ]
+            # Kombination
+            filtered = parser.get_summary_data(
+                groups=['Verdachtsdiagnose', 'Komplexität des Interviews'],
+                patient_ids=['01', '02']
+            )
+        """
+        # Definiere alle möglichen Gruppen
+        all_groups = [
+            'Verdachtsdiagnose',
+            'Notwendige Differentialdiagnosen',
+            'Komorbiditäten',
+            'Komplexität des Interviews',
+            'Sicherheit der Verdachtsdiagnose'
+        ]
 
-    # Bestimme welche Gruppen zu verwenden sind
-    groups_to_use = groups if groups is not None else all_groups
+        # Bestimme welche Gruppen zu verwenden sind
+        groups_to_use = groups if groups is not None else all_groups
 
-    # Validiere die Gruppen
-    invalid_groups = [g for g in groups_to_use if g not in all_groups]
-    if invalid_groups:
-        raise ValueError(f"Ungültige Gruppen: {invalid_groups}. Gültig: {all_groups}")
+        # Validiere die Gruppen
+        invalid_groups = [g for g in groups_to_use if g not in all_groups]
+        if invalid_groups:
+            raise ValueError(f"Ungültige Gruppen: {invalid_groups}. Gültig: {all_groups}")
 
-    # Bestimme welche Patienten zu verwenden sind
-    patients_to_use = patient_ids if patient_ids is not None else list(self.data_structure.keys())
+        # Bestimme welche Patienten zu verwenden sind
+        patients_to_use = patient_ids if patient_ids is not None else list(self.data_structure.keys())
 
-    # Filtere Patienten die nicht existieren
-    patients_to_use = [p for p in patients_to_use if p in self.data_structure]
+        # Filtere Patienten die nicht existieren
+        patients_to_use = [p for p in patients_to_use if p in self.data_structure]
 
-    result = {}
+        result = {}
 
-    # Initialisiere die Gruppen
-    for group in groups_to_use:
-        result[group] = {}
-
-    # Fülle die Daten
-    for patient_id in patients_to_use:
-        patient_data = self.data_structure[patient_id]
-        summary = patient_data.get('insgesammt', {})
-
+        # Initialisiere die Gruppen
         for group in groups_to_use:
-            result[group][patient_id] = summary.get(group)
+            result[group] = {}
 
-    return result
+        # Fülle die Daten
+        for patient_id in patients_to_use:
+            patient_data = self.data_structure[patient_id]
+            summary = patient_data.get('insgesammt', {})
 
+            for group in groups_to_use:
+                result[group][patient_id] = summary.get(group)
 
-# ==================== HILFSMETHODEN FÜR EXPORT ====================
-
-def export_symptoms_to_json(self, output_path: str, episode_type: Optional[str] = None):
-    """
-    Exportiert Symptome im geforderten Format zu JSON.
-
-    Args:
-        output_path: Pfad zur Ausgabe-Datei
-        episode_type: Optional - 'depression' oder 'mania'
-
-    Beispiel:
-        parser.export_symptoms_to_json('symptoms.json', episode_type='depression')
-    """
-    symptoms = self.get_all_symptoms(episode_type=episode_type)
-
-    # Konvertiere zu JSON-kompatiblem Format
-    json_data = {}
-    for patient_id, disorders in symptoms.items():
-        json_data[patient_id] = {}
-        for disorder, times in disorders.items():
-            json_data[patient_id][disorder] = {}
-            for time, chunks in times.items():
-                json_data[patient_id][disorder][time] = chunks
-
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(json_data, f, indent=2, ensure_ascii=False)
-
-    print(f"Symptome exportiert zu: {output_path}")
+        return result
 
 
-def export_diagnostic_criteria_to_json(self, output_path: str, episode_type: Optional[str] = None):
-    """
-    Exportiert diagnostische Kriterien zu JSON.
-
-    Args:
-        output_path: Pfad zur Ausgabe-Datei
-        episode_type: Optional - 'depression' oder 'mania'
-
-    Beispiel:
-        parser.export_diagnostic_criteria_to_json('criteria.json')
-    """
-    criteria = self.get_all_diagnostic_criteria(episode_type=episode_type)
-
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(criteria, f, indent=2, ensure_ascii=False)
-
-    print(f"Diagnostische Kriterien exportiert zu: {output_path}")
 
 
-def export_summary_to_csv(self, output_path: str, groups: Optional[List[str]] = None,
-                          patient_ids: Optional[List[str]] = None):
-    """
-    Exportiert Summary-Daten zu CSV.
-
-    Args:
-        output_path: Pfad zur Ausgabe-Datei
-        groups: Optional - Liste der Gruppen
-        patient_ids: Optional - Liste der Patient-IDs
-
-    Beispiel:
-        parser.export_summary_to_csv('summary.csv')
-    """
-    summary = self.get_summary_data(groups=groups, patient_ids=patient_ids)
-
-    # Konvertiere zu DataFrame
-    df = pd.DataFrame(summary)
-    df.to_csv(output_path, encoding='utf-8', index_label='Patient ID')
-
-    print(f"Summary exportiert zu: {output_path}")
-
-"""
 # Beispiel-Nutzung:
 if __name__ == "__main__":
     # Initialisiere Parser mit verbose mode
@@ -1063,14 +925,15 @@ if __name__ == "__main__":
 
 
     # Optional: Inspiziere ein Sheet zuerst
-    # parser.inspect_sheet('Interview_01')
 
     # Parse alle Interviews
-    data_structure = parser.parse_all_interviews()
-    print(f"\n{data_structure}")
+    parser.parse_all_interviews()
 
-    # 1. Strukturübersicht anschauen
-    parser.print_patient_structure('01')
+    # Interviewabschnitt drucken
+    df = parser.get_transcripts(episode_type='depression', include_time_keys=False)["01"]["depression"]
+    print(df.iloc[0]['transcript'])
+
+    """
 
     # 2. Komplettes Transkript anschauen
     parser.print_patient_transcript('01')
