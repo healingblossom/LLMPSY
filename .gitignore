@@ -25,9 +25,10 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Results
+# Results and other patient-information
 results/
 logs/
+data/
 
 # Cache-Verzeichnisse
 .cache/
