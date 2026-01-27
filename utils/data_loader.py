@@ -50,14 +50,19 @@ class InterviewDataParser:
 
         return interview_sheets
 
-    def extract_patient_id(self, sheet_name: str) -> str:
+    def extract_patient_id_and_language(self, sheet_name: str) -> tuple[str | None, str | None]:
         """
-        Extrahiert die Patienten-ID aus dem Sheet-Namen (z.B. 'Interview_01' -> '01').
+        Extrahiert die Patienten-ID und die Sprache aus dem Sheet-Namen.
+        Erwartetes Format: 'Interview_01_de' oder 'Interview_01_en'.
+        Rückgabe: (patient_id, sprache), z.B. ('01', 'de').
+        Falls kein Match: (None, None).
         """
-        match = re.search(r'interview_(\d+)', sheet_name, re.IGNORECASE)
+        match = re.search(r'interview_(\d+)_(de|en)', sheet_name, re.IGNORECASE)
         if match:
-            return match.group(1)
-        return sheet_name
+            patient_id = match.group(1)
+            language = match.group(2).lower()
+            return patient_id, language
+        return None, None
 
     def _is_episode_header(self, cell_value) -> Tuple[bool, Optional[str]]:
         """
@@ -300,14 +305,18 @@ class InterviewDataParser:
 
         return -1
 
-    def parse_interview_sheet(self, df: pd.DataFrame, patient_id: str) -> Dict:
+    def parse_interview_sheet(self, df: pd.DataFrame, patient_id: str, language: str) -> Dict:
         """
         Parst eine komplette Interview-Tabelle.
         """
         self._log(f"\n=== Parse Patient {patient_id} ===")
         self._log(f"DataFrame Shape: {df.shape}")
 
+        if language not in ['de', 'en']:
+            raise ValueError(f"Sprache {language} unbekannt.")
+
         patient_data = {
+            'language': {language},
             'interviews': {
                 'depression': {},
                 'mania': {}
@@ -366,8 +375,8 @@ class InterviewDataParser:
         interview_sheets = self.load_interview_sheets()
 
         for sheet_name, df in interview_sheets.items():
-            patient_id = self.extract_patient_id(sheet_name)
-            patient_data = self.parse_interview_sheet(df, patient_id)
+            patient_id, language = self.extract_patient_id_and_language(sheet_name)
+            patient_data = self.parse_interview_sheet(df, patient_id, language)
             self.data_structure[patient_id] = patient_data
 
         return self.data_structure
@@ -893,7 +902,7 @@ class InterviewDataParser:
         if invalid_groups:
             raise ValueError(f"Ungültige Gruppen: {invalid_groups}. Gültig: {all_groups}")
 
-        # Bestimme welche Patienten zu verwenden sind
+        # Bestimme, welche Patienten zu verwenden sind
         patients_to_use = patient_ids if patient_ids is not None else list(self.data_structure.keys())
 
         # Filtere Patienten die nicht existieren
@@ -930,6 +939,7 @@ if __name__ == "__main__":
     parser.parse_all_interviews()
 
     # Interviewabschnitt drucken
+    print(parser.data_structure["01"]["language"])
     df = parser.get_transcripts(episode_type='depression', include_time_keys=False)["01"]["depression"]
     print(df.iloc[0]['transcript'])
 

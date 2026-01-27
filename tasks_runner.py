@@ -111,7 +111,8 @@ class TaskRunner:
         self.saved_results_cache: Dict[str, List[TaskResult]] = {}
 
         # Lade alle Prompts beim Starten (optional, kann auch lazy geladen werden)
-        self.prompt_builders: Dict[str, Any] = {}
+        self.prompt_builders_de: Dict[str, Any] = {}
+        self.prompt_builders_en: Dict[str, Any] = {}
         self._initialize_prompt_builders()
 
         logger.info("TaskRunner initialisiert")
@@ -190,7 +191,8 @@ class TaskRunner:
 
         for format_name, builder_class in builder_classes.items():
             try:
-                self.prompt_builders[format_name] = builder_class()
+                self.prompt_builders_de[format_name] = builder_class(self.tasks_config)
+                self.prompt_builders_en[format_name] = builder_class(self.tasks_config, task_prompts_py="prompts.task_prompts_en")
                 logger.info(f"PromptBuilder '{format_name}' initialisiert")
             except Exception as e:
                 logger.warning(f"Konnte PromptBuilder '{format_name}' nicht initialisieren: {e}")
@@ -663,7 +665,7 @@ class TaskRunner:
         manager = ModelManager(self.config_path)
         return manager.load_model(model_name)
 
-    def _get_prompts_for_model(self, model_name: str) -> Dict:
+    def _get_prompts_for_model(self, model_name: str) -> (Dict, Dict):
         """
         Lade alle Prompts für ein Modell
 
@@ -683,15 +685,17 @@ class TaskRunner:
         format_name = model_spec.get('format')
 
         # Hole PromptBuilder für diesen Format
-        if format_name not in self.prompt_builders:
+        if format_name not in self.prompt_builders_de:
             raise ValueError(f"PromptBuilder für Format '{format_name}' nicht initialisiert")
 
-        builder = self.prompt_builders[format_name]
+        builder = self.prompt_builders_de[format_name]
+        builder_en = self.prompt_builders_en[format_name]
 
         # Baue alle Prompts
-        all_prompts = builder.build_all_prompts()
+        all_prompts_de = builder.build_all_prompts()
+        all_prompts_en = builder_en.build_all_prompts()
 
-        return all_prompts
+        return all_prompts_de, all_prompts_en
 
     # ========================================================================
     #                  RESULTS STORAGE METHODS
@@ -765,7 +769,7 @@ class TaskRunner:
     #            METHODE ZUR VERWENDUNG AUẞERHALB DER KLASSE (SCHNITTSTELLE)
     # ========================================================================
 
-    def run_tasks( self, model_name: str, task_ids: Optional[List[str]] = None, patient_ids: Optional[List[str]] = None, dependency_mode: DependencyMode = DependencyMode.GROUND_TRUTH, num_runs: int = 3, output_dir: Optional[str] = None, saved_results_dir: Optional[str] = None,) -> Dict[str, List[TaskResult]]:
+    def run_tasks( self, model_name: str, task_ids: Optional[List[str]] = None, patient_ids: Optional[List[str]] = None, dependency_mode: DependencyMode = DependencyMode.GROUND_TRUTH, num_runs: int = 3, output_dir: Optional[str] = None, saved_results_dir: Optional[str] = None) -> Dict[str, List[TaskResult]]:
         """
         Führe Tasks aus.
 
@@ -820,7 +824,7 @@ class TaskRunner:
 
         # Lade Prompts
         logger.info(f"Lade Prompts für Modell: {model_name}")
-        prompts_dict = self._get_prompts_for_model(model_name)
+        prompts_dict_de, prompts_dict_en = self._get_prompts_for_model(model_name)
 
         # Hauptschleife: Tasks → Patienten → Prompt-Varianten → Episodes → Runs
         all_results: Dict[str, List[TaskResult]] = {}
@@ -844,6 +848,9 @@ class TaskRunner:
             # Iteriere über Patienten
             for patient_id in patient_ids:
                 logger.info(f"\n  Patient: {patient_id}")
+                if self.data_parser.data_structure[patient_id]["language"] == "de":
+                    prompts_dict = prompts_dict_de
+                else: prompts_dict = prompts_dict_en
 
                 # Bestimme Episodes für diesen Patienten
                 episodes = self._get_available_episodetypes_for_patient(

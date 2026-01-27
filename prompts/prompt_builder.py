@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from itertools import product
 from dataclasses import dataclass
+import importlib
 
 # ============================================================================
 # DATA MODELS
@@ -48,29 +49,24 @@ class PromptBuilder():
     snippet assembly logic from base class.
     """
 
-    def __init__(self):
+    def __init__(self, task_config, task_prompts_py: Optional[str] = "prompts.task_prompts"):
         """
         Initialize builder with task configuration.
 
         """
-        tasks_config_path = "/home/blossom/PycharmProjects/LLMPSY/config/tasks.yaml" #todo
-
-        with open(tasks_config_path, 'r', encoding='utf-8') as f:
-            self.tasks_config = yaml.safe_load(f)
+        self.tasks_config = task_config
 
         # Import snippet dictionaries
-        from prompts.task_prompts import (
-            ROLES, COT, TASKS, FORMATS, INPUTS, EXAMPLES, SYMPTOMS, CRITERIA
-        )
+        prompts_file = importlib.import_module(task_prompts_py)
 
-        self.roles = ROLES
-        self.cot = COT
-        self.tasks = TASKS
-        self.symptoms = SYMPTOMS
-        self.criteria = CRITERIA
-        self.formats = FORMATS
-        self.inputs = INPUTS
-        self.examples = EXAMPLES
+        self.roles = prompts_file.ROLES
+        self.cot = prompts_file.COT
+        self.tasks = prompts_file.TASKS
+        self.symptoms = prompts_file.SYMPTOMS
+        self.criteria = prompts_file.CRITERIA
+        self.formats = prompts_file.FORMATS
+        self.inputs = prompts_file.INPUTS
+        self.examples = prompts_file.EXAMPLES
 
     @property
     @abstractmethod
@@ -460,7 +456,11 @@ Below is an instruction that describes a task, paired with an input that provide
 """
 # Beispiel-Nutzung:
 if __name__ == "__main__":
-    alpaca_builder = AlpacaPromptBuilder()
+    task_config_path = "some_path" #todo
+
+    with open(task_config_path, 'r', encoding='utf-8') as f:
+        tasks_config = yaml.safe_load(f)
+    alpaca_builder = AlpacaPromptBuilder(tasks_config, "prompts.task_prompts")
     all_prompts = alpaca_builder.build_all_prompts()
 
     for task_id, variants in all_prompts.items():
