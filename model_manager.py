@@ -11,15 +11,18 @@ class ModelManager:
     """Intelligentes Laden und Cleanup von Modellen"""
 
     # Konstruktor der Modelle, speichert die configs als Class-Parameter und ruft die Pfade auf
-    def __init__(self, model_name):
+    def __init__(self, model_name:str, config_path:str):
         """Initialisiere mit Config"""
-        with open('config.yaml') as f:
+        with open(config_path) as f:
             self.config = yaml.safe_load(f)
 
         for each_model in self.config['models']:
             if each_model['name'] == model_name:
                 self.model_spec = each_model
-        raise ValueError(f"Modell '{model_name}' nicht in config.yaml gefunden!")
+                break
+
+        if self.model_spec is None:
+            raise ValueError(f"Modell '{model_name}' nicht in config.yaml gefunden!")
     
     def get_model_spec(self):
         """Finde Modell-Spec in Config"""

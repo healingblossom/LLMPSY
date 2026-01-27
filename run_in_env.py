@@ -5,13 +5,8 @@ import sys
 import os
 import yaml
 
-with open("config.yaml") as f:
-    config = yaml.safe_load(f)
-CONDA_ENVS_ROOT = config['paths']['conda_env_directory']
-PROJECT_ROOT = config['paths']['proj_directory']
 
-
-def run_in_conda_env(env_name, python_script, script_args=None):
+def run_in_conda_env(env_name, python_script, conda_envs_root, script_args=None):
     """
     Führt ein Python-Script in einem conda-Environment aus, das
     in .conda_envs im Projekt liegt.
@@ -23,12 +18,13 @@ def run_in_conda_env(env_name, python_script, script_args=None):
 
     Returns:
         int: Return-Code (0 = Erfolg, != 0 = Fehler)
+        :param conda_envs_root: .conda_envs/ Pfad zu den conda-enviroments
     """
     
     if script_args is None:
         script_args = []
 
-    env_prefix = os.path.join(CONDA_ENVS_ROOT, env_name)
+    env_prefix = os.path.join(conda_envs_root, env_name)
 
     cmd = [
         "conda", "run",
