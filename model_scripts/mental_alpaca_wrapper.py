@@ -33,6 +33,5 @@ class MentalAlpacaWrapper():
 # Tests
 # ============================================================================
 
-if __name__ == "__main__":
-    run_in_conda_env("mental_alpaca", tasks_runner.py, script_args=[] )
-
+    def generate_from_prompt_test(self, prompt):
+        return prompt

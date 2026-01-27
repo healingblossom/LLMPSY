@@ -416,35 +416,46 @@ class TaskRunner:
             return "[TRANSKRIPT NICHT VERFÜGBAR]"
 
         try:
+            transcripts = self.data_parser.get_transcripts(
+                episode_type=episode_type,
+                include_time_keys=(episode_type is None)
+            )
+
+            patient_data = transcripts[patient_id]
+            all_transcripts = []
+
             if episode_type is None:
-                # Für non-episode-divided: kombiniere alle Episodes
-                all_transcripts = []
-                transcripts = self.data_parser.get_transcripts()
-                patient_data = transcripts.get(patient_id, {})
-
                 for disorder in ['depression', 'mania']:
-                    for time_frame in ['aktuelle', 'frühere']:
-                        df = patient_data.get(disorder, {}).get(time_frame)
-                        if isinstance(df, pd.DataFrame) and len(df) > 0:
-                            all_transcripts.append(df['transcript'].str.cat(sep='\n\n'))
+                    if disorder not in patient_data:
+                        continue
 
-                return '\n\n---\n\n'.join(all_transcripts)
+                    disorder_dict = patient_data[disorder]
+
+                    for time_key in ['aktuelle', 'frühere']:
+                        if time_key in disorder_dict:
+                            df = disorder_dict[time_key]
+                            if isinstance(df, pd.DataFrame) and len(df) > 0:
+                                # Filtere NaN-Werte raus und konvertiere zu String
+                                transcripts_list = [
+                                    str(t) for t in df['transcript'].tolist()
+                                    if pd.notna(t)  # Nur nicht-NaN Werte
+                                ]
+                                all_transcripts.extend(transcripts_list)
             else:
-                # Für episode-divided: hole spezifische Episode
-                transcripts = self.data_parser.get_transcripts(episode_type)
-                patient_transcripts = transcripts.get(patient_id, {})
+                df = patient_data[episode_type]
+                if isinstance(df, pd.DataFrame) and len(df) > 0:
+                    # Filtere NaN-Werte raus und konvertiere zu String
+                    transcripts_list = [
+                        str(t) for t in df['transcript'].tolist()
+                        if pd.notna(t)  # Nur nicht-NaN Werte
+                    ]
+                    all_transcripts.extend(transcripts_list)
 
-                combined = []
-                for time_frame in ['aktuelle', 'frühere']:
-                    df = patient_transcripts.get(time_frame)
-                    if isinstance(df, pd.DataFrame) and len(df) > 0:
-                        combined.append(df['transcript'].str.cat(sep='\n\n'))
-
-                return '\n\n---\n\n'.join(combined)
+            return '\n\n---\n\n'.join(all_transcripts)
 
         except Exception as e:
             logger.error(f"Fehler beim Laden Transkript für Patient {patient_id}: {e}")
-            return "[TRANSKRIPT FEHLGESCHLAGEN]"
+            raise ValueError(f"Transkript Fehlgeschlagen")
 
     def _get_ground_truth_task1(self, patient_id: str, episode_type: Optional[str]) -> str:
         """Hole Ground-Truth Symptome aus Daten für Task 1"""
@@ -662,7 +673,7 @@ class TaskRunner:
 
     def _load_model(self, model_name: str) -> Any:
         """Lade Modell via ModelManager"""
-        manager = ModelManager(self.config_path)
+        manager = ModelManager(model_name,self.config_path)
         return manager.load_model(model_name)
 
     def _get_prompts_for_model(self, model_name: str) -> (Dict, Dict):
@@ -876,7 +887,6 @@ class TaskRunner:
                         # Fülle Prompt mit Daten
                         formatted_prompt = self._format_prompt_with_data(
                             prompt_template,
-                            task_id,
                             patient_id,
                             episode_type,
                             dependency_mode,
@@ -921,94 +931,28 @@ class TaskRunner:
 
         return all_results
 
-
-# ============================================================================
-#             CONVENIENCE FUNCTIONS (Beispiel_nutzen)
-# ============================================================================
-
-def run_default_pipeline(
-    model_name: str = "mental_alpaca",
-    patient_ids: Optional[List[str]] = None,
-    num_runs: int = 1,
-    use_ground_truth: bool = True,
-    saved_results_dir: Optional[str] = None,
-) -> Dict[str, List[TaskResult]]:
-    """
-    Convenience-Funktion: Führe alle Tasks für alle Patienten aus.
-
-    Args:
-        model_name: Modell zu verwenden
-        patient_ids: Patient-IDs (None = alle)
-        num_runs: Anzahl Replikationen pro Task
-        use_ground_truth: True = Ground-Truth Dependencies, False = LLM Dependencies
-        saved_results_dir: Für SAVED_RESULTS Modus: Verzeichnis mit vorherigen Ergebnissen
-
-    Returns:
-        Alle Ergebnisse
-
-    Beispiele:
-        # Standard: Ground-Truth Dependencies
-        results = run_default_pipeline(
-            model_name="mental_alpaca",
-            patient_ids=['01', '02'],
-            num_runs=3,
-            use_ground_truth=True
-        )
-
-        # Mit LLM Dependencies
-        results = run_default_pipeline(
-            model_name="mistral",
-            use_ground_truth=False,
-            num_runs=2
-        )
-
-        # Mit gespeicherten Ergebnissen von früheren Durchläufen
-        results = run_default_pipeline(
-            model_name="mental_alpaca",
-            use_ground_truth=False,  # Will be overridden to SAVED_RESULTS
-            saved_results_dir="./results",
-            num_runs=1
-        )
-    """
-    runner = TaskRunner()
-
-    dependency_mode = (
-        DependencyMode.GROUND_TRUTH if use_ground_truth
-        else DependencyMode.DEPENDENCY
-    )
-
-    return runner.run_tasks(
-        task_ids=None,  # Alle Tasks
-        patient_ids=patient_ids,
-        model_name=model_name,
-        dependency_mode=dependency_mode,
-        num_runs=num_runs,
-        saved_results_dir=saved_results_dir,
-    )
-
-
 if __name__ == "__main__":
     # ========================================================================
     # BEISPIELE ZUR NUTZUNG
     # ========================================================================
+    """
+    # Beispiel 1: Minimum Funktionalitätsprüfung
+    #run_in_conda_env("mental_alpaca", tasks_runner.py, script_args=[] )
+    runner = TaskRunner(config_path="/home/blossom/PycharmProjects/LLMPSY/config/config.yaml", data_file="/home/blossom/PycharmProjects/LLMPSY/data/LLM-PSY_Labeln_Synthetische_Daten_v1.0.xlsm")
+    runner.run_tasks("mental_alpaca", ["task_1_symptom_detection_and_sectioning", "task_2_diagnostic_criteria", "task_3_diagnostic", "task_4_summary"], ["01"], output_dir="results", saved_results_dir="results")
+    #"""
 
-    # Beispiel 1: Einfache Ausführung mit Ground-Truth Dependencies
-    # results = run_default_pipeline(
-    #     model_name="mental_alpaca",
-    #     patient_ids=['01', '02', '03'],
-    #     num_runs=3,
-    #     use_ground_truth=True
-    # )
-
+    """
     # Beispiel 2: Nur Task 1 und Task 2 mit LLM Dependencies
-    # runner = TaskRunner()
-    # results = runner.run_tasks(
-    #     task_ids=['task_1_symptom_detection_and_sectioning', 'task_2_diagnostic_criteria'],
-    #     patient_ids=['01'],
-    #     model_name='mental_alpaca',
-    #     dependency_mode=DependencyMode.DEPENDENCY,
-    #     num_runs=2,
-    # )
+    runner = TaskRunner()
+    results = runner.run_tasks(
+        task_ids=['task_1_symptom_detection_and_sectioning', 'task_2_diagnostic_criteria'],
+        patient_ids=['01'],
+        model_name='mental_alpaca',
+        dependency_mode=DependencyMode.DEPENDENCY,
+        num_runs=2,
+    )
+    """
 
     # Beispiel 3: Task 4 auf gespeicherten Ergebnissen von Task 1, 2, 3 ausführen
     # runner = TaskRunner()

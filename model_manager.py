@@ -4,8 +4,8 @@ import os
 import yaml
 import shutil
 
-from model_scripts.mental_alpaca import MentalAlpacaWrapper
-from model_scripts.mistral import MistralWrapper
+from model_scripts.mental_alpaca_wrapper import MentalAlpacaWrapper
+#from model_scripts.mistral import MistralWrapper
 
 class ModelManager:
     """Intelligentes Laden und Cleanup von Modellen"""
@@ -21,7 +21,7 @@ class ModelManager:
                 self.model_spec = each_model
         raise ValueError(f"Modell '{model_name}' nicht in config.yaml gefunden!")
     
-    def get_model_spec(self, model_name):
+    def get_model_spec(self):
         """Finde Modell-Spec in Config"""
 
         return self.model_spec
@@ -31,7 +31,7 @@ class ModelManager:
         Lade ein Modell basierend auf Source-Type.
         Für Server-Modelle: Validiere nur, dass der Pfad existiert.
         """
-        model_spec = self.get_model_spec(model_name)
+        model_spec = self.get_model_spec()
         source = model_spec['source']
         
         print(f"\nLade Modell: {model_name}")
