@@ -309,10 +309,10 @@ class PromptBuilder():
             return MistralPromptBuilder.build_all_prompts()
 
         elif format == 'flan':
-            return FLANPromptBuilder.build_all_prompts()
+            return FlanPromptBuilder.build_all_prompts()
 
         elif format == 'openrouter':
-            return OpenRouterPromptBuilder.build_all_prompts()
+            return OpenrouterPromptBuilder.build_all_prompts()
 
         else:
             raise NotImplementedError(f"Source '{format}' nicht implementiert")
@@ -321,7 +321,7 @@ class PromptBuilder():
 # ============================================================================
 # FORMAT IMPLEMENTATIONS (BITTE DIESE KLASSEN VERWENDEN ZUM ARBEITEN)
 # ============================================================================
-class FLANPromptBuilder(PromptBuilder):
+class FlanPromptBuilder(PromptBuilder):
     """
     FLAN format builder.
 
@@ -350,7 +350,7 @@ class FLANPromptBuilder(PromptBuilder):
         return prompt.strip()
 
 
-class OpenRouterPromptBuilder(PromptBuilder):
+class OpenrouterPromptBuilder(PromptBuilder):
     """
     OpenRouter format builder (Chat Completions API).
 
