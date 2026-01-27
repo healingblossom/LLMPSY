@@ -40,9 +40,10 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 class DependencyMode(Enum):
-    """Modus für Task-Dependencies: Ground-Truth vs. LLM-Results"""
+    """Modus für Task-Dependencies: Ground-Truth vs. LLM-Results vs. Saved-Results"""
     GROUND_TRUTH = "ground_truth"  # Nutze Ground-Truth aus Daten
-    DEPENDENCY = "dependency"  # Nutze Ergebnisse vorheriger Tasks
+    DEPENDENCY = "dependency"  # Nutze Ergebnisse vorheriger Tasks (aktuelle Session)
+    SAVED_RESULTS = "saved_results"  # Nutze gespeicherte Ergebnisse von früheren Durchläufen
 
 
 @dataclass
@@ -70,13 +71,14 @@ class TaskRunner:
     """
     Zentrale Klasse für Task-Ausführung mit folgenden Features:
     - Selektive Task-Ausführung für bestimmte Patienten
-    - Dependency-Validierung (Ground-Truth vs. LLM-Results)
+    - Dependency-Validierung (Ground-Truth vs. LLM-Results vs. Saved-Results)
     - Strukturierte Ergebnisspeicherung
     - Mehrfache Generierungen pro Task (für Reproduzierbarkeit)
     - Dynamische Dateneinpflanzung in Prompts
+    - Unterstützung für gespeicherte Ergebnisse früherer Durchläufe
     """
 
-    def __init__( self, config_path: str = "config/config.yaml", data_file: str = None, verbose: bool = False):
+    def __init__(self, config_path: str = "config/config.yaml", data_file: str = None, verbose: bool = False):
         """
         Initialisiere TaskRunner
 
@@ -104,6 +106,9 @@ class TaskRunner:
 
         # Ergebnisse Cache (für aktuelle Session)
         self.results_cache: Dict[str, List[TaskResult]] = {}
+
+        # Gespeicherte Ergebnisse Cache (aus Dateisystem)
+        self.saved_results_cache: Dict[str, List[TaskResult]] = {}
 
         # Lade alle Prompts beim Starten (optional, kann auch lazy geladen werden)
         self.prompt_builders: Dict[str, Any] = {}
@@ -190,14 +195,18 @@ class TaskRunner:
             except Exception as e:
                 logger.warning(f"Konnte PromptBuilder '{format_name}' nicht initialisieren: {e}")
 
-
     # ========================================================================
     #           DEPENDENCY & VALIDATION METHODS
     # ========================================================================
 
-    def _validate_dependencies(self, requested_task_ids: List[str]) -> None:
+    def _validate_dependencies( self, requested_task_ids: List[str], dependency_mode: DependencyMode, results_dir: Optional[str] = None) -> None:
         """
         Validiere, dass alle Dependencies für die Tasks erfüllt sind.
+
+        Args:
+            requested_task_ids: Task-IDs die ausgeführt werden sollen
+            dependency_mode: Welcher Modus wird verwendet
+            results_dir: Verzeichnis mit gespeicherten Ergebnissen (nur für SAVED_RESULTS relevant)
 
         Raises:
             ValueError: Wenn eine Task angefordert wird, deren Dependencies nicht erfüllt sind
@@ -214,13 +223,49 @@ class TaskRunner:
 
             for dep_task_id in depends_on:
                 if dep_task_id not in requested_task_ids:
-                    raise ValueError(
-                        f"Task '{task_id}' hängt von '{dep_task_id}' ab, "
-                        f"aber '{dep_task_id}' wurde nicht in den angeforderten Tasks aufgeführt!\n"
-                        f"Bitte addiere '{dep_task_id}' zu deiner Task-Liste."
-                    )
+                    # Für SAVED_RESULTS: prüfe ob Results existieren
+                    if dependency_mode == DependencyMode.SAVED_RESULTS:
+                        if not self._check_saved_results_exist(dep_task_id, results_dir):
+                            raise ValueError(
+                                f"Task '{task_id}' hängt von '{dep_task_id}' ab, "
+                                f"aber '{dep_task_id}' wurde nicht in den angeforderten Tasks aufgeführt "
+                                f"und gespeicherte Ergebnisse existieren nicht!\n"
+                                f"Entweder: (1) '{dep_task_id}' zu Task-Liste hinzufügen, oder "
+                                f"(2) Sicherstellen, dass Ergebnisse von '{dep_task_id}' in {results_dir} vorhanden sind."
+                            )
+                    else:
+                        raise ValueError(
+                            f"Task '{task_id}' hängt von '{dep_task_id}' ab, "
+                            f"aber '{dep_task_id}' wurde nicht in den angeforderten Tasks aufgeführt!\n"
+                            f"Bitte addiere '{dep_task_id}' zu deiner Task-Liste."
+                        )
 
         logger.info("✓ Alle Dependencies validiert")
+
+    def _check_saved_results_exist(self, task_id: str, results_dir: Optional[str]) -> bool:
+        """
+        Prüfe, ob gespeicherte Ergebnisse für eine Task existieren.
+
+        Returns:
+            True wenn Ergebnisse vorhanden, False sonst
+        """
+        if not results_dir or not os.path.isdir(results_dir):
+            return False
+
+        # Suche nach Ergebnissen im Format: {results_dir}/{model_name}/{task_id}/results_*.jsonl
+        for model_dir in os.listdir(results_dir):
+            model_path = os.path.join(results_dir, model_dir)
+            if not os.path.isdir(model_path):
+                continue
+
+            task_path = os.path.join(model_path, task_id)
+            if os.path.isdir(task_path):
+                # Prüfe, ob mindestens eine JSONL-Datei existiert
+                for file in os.listdir(task_path):
+                    if file.startswith('results_') and file.endswith('.jsonl'):
+                        return True
+
+        return False
 
     # ========================================================================
     # DATA & PROMPT FORMATTING METHODS
@@ -228,7 +273,7 @@ class TaskRunner:
 
     def _get_available_episodetypes_for_patient(self, patient_id: str, episodes_divided: bool) -> List[Optional[str]]:
         """
-        Bestimme welche Episodes für einen Patienten relevant sind. Gibt nur zurück, welche Episodentypen ein Patient hat, nicht die Interviews selbst.
+        Bestimme, welche Episodes für einen Patienten relevant sind. Gibt nur zurück, welche Episodentypen ein Patient hat, nicht die Interviews selbst.
 
         Returns:
             ['depression', 'mania'] wenn episodes_divided=True
@@ -280,7 +325,7 @@ class TaskRunner:
 
         return filtered_prompts if filtered_prompts else task_prompts
 
-    def _format_prompt_with_data( self, prompt_template: str, task_id: str,  patient_id: str, episode_type: Optional[str], dependency_mode: DependencyMode) -> str:
+    def _format_prompt_with_data( self, prompt_template: str, patient_id: str, episode_type: Optional[str], dependency_mode: DependencyMode, results_dir: Optional[str] = None) -> str:
         """
         Fülle Prompt-Template mit echten Daten ein.
 
@@ -289,6 +334,13 @@ class TaskRunner:
         - {previous_results_task1}: Ergebnisse von Task 1
         - {previous_results_task2}: Ergebnisse von Task 2
         - {previous_results_task3}: Ergebnisse von Task 3
+
+        Args:
+            prompt_template: Template mit Platzhaltern
+            patient_id: Patient ID
+            episode_type: Episode Type (oder None)
+            dependency_mode: Welcher Modus für Dependencies
+            results_dir: Verzeichnis mit gespeicherten Ergebnissen (für SAVED_RESULTS)
         """
         formatted_prompt = prompt_template
 
@@ -301,7 +353,14 @@ class TaskRunner:
         if "{previous_results_task1}" in formatted_prompt:
             if dependency_mode == DependencyMode.GROUND_TRUTH:
                 task1_results = self._get_ground_truth_task1(patient_id, episode_type)
-            else:
+            elif dependency_mode == DependencyMode.SAVED_RESULTS:
+                task1_results = self._get_saved_results_task(
+                    'task_1_symptom_detection_and_sectioning',
+                    patient_id,
+                    episode_type,
+                    results_dir
+                )
+            else:  # DEPENDENCY
                 task1_results = self._get_llm_results_task1(patient_id, episode_type)
 
             formatted_prompt = formatted_prompt.replace(
@@ -312,8 +371,15 @@ class TaskRunner:
         # ====== {previous_results_task2} ======
         if "{previous_results_task2}" in formatted_prompt:
             if dependency_mode == DependencyMode.GROUND_TRUTH:
-                task2_results = self._get_ground_truth_task2(patient_id, episode_type)
-            else:
+                task2_results = self._get_ground_truth_task2(patient_id)
+            elif dependency_mode == DependencyMode.SAVED_RESULTS:
+                task2_results = self._get_saved_results_task(
+                    'task_2_diagnostic_criteria',
+                    patient_id,
+                    episode_type,
+                    results_dir
+                )
+            else:  # DEPENDENCY
                 task2_results = self._get_llm_results_task2(patient_id, episode_type)
 
             formatted_prompt = formatted_prompt.replace(
@@ -325,7 +391,14 @@ class TaskRunner:
         if "{previous_results_task3}" in formatted_prompt:
             if dependency_mode == DependencyMode.GROUND_TRUTH:
                 task3_results = self._get_ground_truth_task3(patient_id)
-            else:
+            elif dependency_mode == DependencyMode.SAVED_RESULTS:
+                task3_results = self._get_saved_results_task(
+                    'task_3_diagnostic',
+                    patient_id,
+                    None,  # Task 3 ist nicht episodes_divided
+                    results_dir
+                )
+            else:  # DEPENDENCY
                 task3_results = self._get_llm_results_task3(patient_id)
 
             formatted_prompt = formatted_prompt.replace(
@@ -463,6 +536,124 @@ class TaskRunner:
 
         return latest_result.result
 
+    def _get_saved_results_task( self, task_id: str, patient_id: str, episode_type: Optional[str], results_dir: Optional[str]) -> str:
+        """
+        Hole Ergebnisse für eine Task aus gespeicherten Dateien.
+
+        Sucht zuerst im Cache, dann im Dateisystem.
+        Nimmt das neueste Ergebnis (höchste run_number) oder ersten Variant.
+
+        Args:
+            task_id: Task ID
+            patient_id: Patient ID
+            episode_type: Episode Type oder None
+            results_dir: Verzeichnis mit Ergebnissen
+
+        Returns:
+            Ergebnis-String (JSON formatiert) oder leeres String wenn nicht gefunden
+        """
+        # Erstelle Cache-Key
+        cache_key = f"saved_{task_id}_{patient_id}_{episode_type}"
+
+        # Prüfe Cache
+        if cache_key in self.saved_results_cache:
+            results = self.saved_results_cache[cache_key]
+            if results:
+                latest = max(results, key=lambda r: r.run_number)
+                return latest.result
+
+        # Prüfe Dateisystem
+        if results_dir and os.path.isdir(results_dir):
+            result = self._load_saved_result_from_disk(
+                task_id,
+                patient_id,
+                episode_type,
+                results_dir
+            )
+
+            if result:
+                # Cachen
+                if cache_key not in self.saved_results_cache:
+                    self.saved_results_cache[cache_key] = []
+                self.saved_results_cache[cache_key].append(result)
+
+                return result.result
+
+        logger.warning(
+            f"Keine gespeicherten Ergebnisse für Task '{task_id}', "
+            f"Patient '{patient_id}', Episode '{episode_type}'"
+        )
+        return "{}"
+
+    def _load_saved_result_from_disk( self, task_id: str, patient_id: str, episode_type: Optional[str], results_dir: str) -> Optional[TaskResult]:
+        """
+        Lade ein einzelnes gespeichertes Ergebnis von der Festplatte.
+
+        Sucht im Verzeichnis: {results_dir}/{model_name}/{task_id}/{patient_id}/
+        Nach Dateien: {episode}_{variant}_{run}.json
+
+        Returns:
+            TaskResult oder None wenn nicht gefunden
+        """
+        try:
+            # Iteriere über alle Modelle im results_dir
+            for model_dir in os.listdir(results_dir):
+                model_path = os.path.join(results_dir, model_dir)
+                if not os.path.isdir(model_path):
+                    continue
+
+                task_path = os.path.join(model_path, task_id)
+                if not os.path.isdir(task_path):
+                    continue
+
+                patient_path = os.path.join(task_path, patient_id)
+                if not os.path.isdir(patient_path):
+                    continue
+
+                # Suche nach relevanten Dateien
+                episode_str = episode_type or "all_episodes"
+                best_result = None
+                best_run = 0
+
+                for filename in os.listdir(patient_path):
+                    if not filename.endswith('.json'):
+                        continue
+
+                    # Parse Dateiname: {episode}_{variant}_{run}.json
+                    parts = filename.replace('.json', '').rsplit('_', 2)
+                    if len(parts) != 3:
+                        continue
+
+                    file_episode, variant, run_str = parts
+
+                    # Prüfe ob Episode passt
+                    if file_episode != episode_str:
+                        continue
+
+                    try:
+                        run_num = int(run_str.replace('run_', ''))
+                    except ValueError:
+                        continue
+
+                    # Nimm das Ergebnis mit höchster run_number
+                    if run_num > best_run:
+                        filepath = os.path.join(patient_path, filename)
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            result_dict = json.load(f)
+                            best_result = TaskResult(**result_dict)
+                            best_run = run_num
+
+                if best_result:
+                    return best_result
+
+        except Exception as e:
+            logger.error(
+                f"Fehler beim Laden gespeicherter Ergebnisse für Task '{task_id}', "
+                f"Patient '{patient_id}': {e}"
+            )
+
+        return None
+
     # ========================================================================
     #             MODEL & PROMPT LOADING METHODS
     # ========================================================================
@@ -570,14 +761,13 @@ class TaskRunner:
 
         logger.info(f"✓ Summary gespeichert: {summary_path}")
 
-
     # ========================================================================
     #            METHODE ZUR VERWENDUNG AUẞERHALB DER KLASSE (SCHNITTSTELLE)
     # ========================================================================
 
-    def run_tasks( self, model_name: str, task_ids: Optional[List[str]] = None, patient_ids: Optional[List[str]] = None, dependency_mode: DependencyMode = DependencyMode.GROUND_TRUTH, num_runs: int = 3, output_dir: Optional[str] = None) -> Dict[str, List[TaskResult]]:
+    def run_tasks( self, model_name: str, task_ids: Optional[List[str]] = None, patient_ids: Optional[List[str]] = None, dependency_mode: DependencyMode = DependencyMode.GROUND_TRUTH, num_runs: int = 3, output_dir: Optional[str] = None, saved_results_dir: Optional[str] = None,) -> Dict[str, List[TaskResult]]:
         """
-        Führe Tasks.
+        Führe Tasks aus.
 
         Args:
             task_ids: Liste von Task-IDs zum Ausführen (z.B. ['task_1_...', 'task_2_...'])
@@ -585,10 +775,12 @@ class TaskRunner:
             patient_ids: Liste von Patient-IDs (z.B. ['01', '02', '03'])
                         Wenn None: Alle Patienten
             model_name: Modellname aus config.yaml (z.B. 'mental_alpaca')
-            dependency_mode: GROUND_TRUTH oder DEPENDENCY
+            dependency_mode: GROUND_TRUTH, DEPENDENCY, oder SAVED_RESULTS
             num_runs: Wie oft jede Task repliziert werden soll (für Reproduzierbarkeit)
             output_dir: Verzeichnis für Ergebnisspeicherung
                        Wenn None: Verwendet config['paths']['proj_directory']/results
+            saved_results_dir: Verzeichnis mit gespeicherten Ergebnissen (nur für SAVED_RESULTS Modus)
+                              Wenn None bei SAVED_RESULTS: Nutzt output_dir
 
         Returns:
             Dict[task_id -> List[TaskResult]]
@@ -600,20 +792,27 @@ class TaskRunner:
         if task_ids is None:
             task_ids = [t['task_id'] for t in self.tasks_config.get('tasks', [])]
 
-        self._validate_dependencies(task_ids)
-
         if patient_ids is None:
             if self.data_parser:
                 patient_ids = list(self.data_parser.data_structure.keys())
             else:
                 raise ValueError("Keine patient_ids angegeben und kein Data Parser initialisiert")
 
-        # Setup
+        # Setup Output-Verzeichnis
         if output_dir is None:
             proj_dir = self.config.get('paths', {}).get('proj_directory', '.')
             output_dir = os.path.join(proj_dir, 'results')
 
         os.makedirs(output_dir, exist_ok=True)
+
+        # Setup Saved-Results-Verzeichnis (falls SAVED_RESULTS Modus)
+        if dependency_mode == DependencyMode.SAVED_RESULTS:
+            if saved_results_dir is None:
+                saved_results_dir = output_dir
+            logger.info(f"Nutze gespeicherte Ergebnisse von: {saved_results_dir}")
+
+        # Validiere Dependencies
+        self._validate_dependencies(task_ids, dependency_mode, saved_results_dir)
 
         # Lade Modell
         logger.info(f"Lade Modell: {model_name}")
@@ -623,12 +822,13 @@ class TaskRunner:
         logger.info(f"Lade Prompts für Modell: {model_name}")
         prompts_dict = self._get_prompts_for_model(model_name)
 
-        # Hauptschleife: Tasks → Patienten → Episodes → Runs
+        # Hauptschleife: Tasks → Patienten → Prompt-Varianten → Episodes → Runs
         all_results: Dict[str, List[TaskResult]] = {}
 
         for task_id in task_ids:
             logger.info(f"\n{'=' * 60}")
             logger.info(f"Starte Task: {task_id}")
+            logger.info(f"Dependency Mode: {dependency_mode.value}")
             logger.info(f"{'=' * 60}")
 
             task_results = []
@@ -672,7 +872,8 @@ class TaskRunner:
                             task_id,
                             patient_id,
                             episode_type,
-                            dependency_mode
+                            dependency_mode,
+                            saved_results_dir,
                         )
 
                         # Führe x Mal aus (für Reproduzierbarkeit)
@@ -697,7 +898,7 @@ class TaskRunner:
 
                             task_results.append(task_result)
 
-                            # Cache für Dependencies
+                            # Cache für Dependencies (aktuelle Session)
                             cache_key = f"{task_id}_{patient_id}_{episode_type}"
                             if cache_key not in self.results_cache:
                                 self.results_cache[cache_key] = []
@@ -713,11 +914,18 @@ class TaskRunner:
 
         return all_results
 
+
 # ============================================================================
 #             CONVENIENCE FUNCTIONS (Beispiel_nutzen)
 # ============================================================================
 
-def run_default_pipeline( model_name: str = "mental_alpaca", patient_ids: Optional[List[str]] = None, num_runs: int = 1, use_ground_truth: bool = True) -> Dict[str, List[TaskResult]]:
+def run_default_pipeline(
+    model_name: str = "mental_alpaca",
+    patient_ids: Optional[List[str]] = None,
+    num_runs: int = 1,
+    use_ground_truth: bool = True,
+    saved_results_dir: Optional[str] = None,
+) -> Dict[str, List[TaskResult]]:
     """
     Convenience-Funktion: Führe alle Tasks für alle Patienten aus.
 
@@ -726,16 +934,33 @@ def run_default_pipeline( model_name: str = "mental_alpaca", patient_ids: Option
         patient_ids: Patient-IDs (None = alle)
         num_runs: Anzahl Replikationen pro Task
         use_ground_truth: True = Ground-Truth Dependencies, False = LLM Dependencies
+        saved_results_dir: Für SAVED_RESULTS Modus: Verzeichnis mit vorherigen Ergebnissen
 
     Returns:
         Alle Ergebnisse
 
-    Beispiel:
+    Beispiele:
+        # Standard: Ground-Truth Dependencies
         results = run_default_pipeline(
             model_name="mental_alpaca",
             patient_ids=['01', '02'],
             num_runs=3,
             use_ground_truth=True
+        )
+
+        # Mit LLM Dependencies
+        results = run_default_pipeline(
+            model_name="mistral",
+            use_ground_truth=False,
+            num_runs=2
+        )
+
+        # Mit gespeicherten Ergebnissen von früheren Durchläufen
+        results = run_default_pipeline(
+            model_name="mental_alpaca",
+            use_ground_truth=False,  # Will be overridden to SAVED_RESULTS
+            saved_results_dir="./results",
+            num_runs=1
         )
     """
     runner = TaskRunner()
@@ -751,6 +976,7 @@ def run_default_pipeline( model_name: str = "mental_alpaca", patient_ids: Option
         model_name=model_name,
         dependency_mode=dependency_mode,
         num_runs=num_runs,
+        saved_results_dir=saved_results_dir,
     )
 
 
@@ -759,30 +985,46 @@ if __name__ == "__main__":
     # BEISPIELE ZUR NUTZUNG
     # ========================================================================
 
-    # Beispiel 1: Einfache Ausführung aller Tasks
+    # Beispiel 1: Einfache Ausführung mit Ground-Truth Dependencies
     # results = run_default_pipeline(
     #     model_name="mental_alpaca",
     #     patient_ids=['01', '02', '03'],
-    #     num_runs=3
+    #     num_runs=3,
+    #     use_ground_truth=True
     # )
 
-    # Beispiel 2: Nur Task 1 und Task 2 für einen Patienten
+    # Beispiel 2: Nur Task 1 und Task 2 mit LLM Dependencies
     # runner = TaskRunner()
     # results = runner.run_tasks(
     #     task_ids=['task_1_symptom_detection_and_sectioning', 'task_2_diagnostic_criteria'],
     #     patient_ids=['01'],
     #     model_name='mental_alpaca',
+    #     dependency_mode=DependencyMode.DEPENDENCY,
     #     num_runs=2,
     # )
 
-    # Beispiel 3: Mit LLM-Dependencies statt Ground-Truth
+    # Beispiel 3: Task 4 auf gespeicherten Ergebnissen von Task 1, 2, 3 ausführen
     # runner = TaskRunner()
     # results = runner.run_tasks(
-    #     task_ids=None,  # Alle
-    #     patient_ids=None,  # Alle
-    #     model_name='mistral',
-    #     dependency_mode=DependencyMode.DEPENDENCY,
-    #     num_runs=1,
+    #     task_ids=['task_4_summary'],  # Nur Task 4
+    #     patient_ids=['01', '02'],
+    #     model_name='mental_alpaca',
+    #     dependency_mode=DependencyMode.SAVED_RESULTS,
+    #     saved_results_dir="./results",  # Verzeichnis mit Ergebnissen von früheren Durchläufen
+    #     num_runs=2,
     # )
+
+    # Beispiel 4: Task 3 mit verschiedenen Dependency-Modi vergleichen
+    # runner = TaskRunner()
+    # for dep_mode in [DependencyMode.GROUND_TRUTH, DependencyMode.DEPENDENCY, DependencyMode.SAVED_RESULTS]:
+    #     logger.info(f"\n\nFühre Task 3 mit {dep_mode.value} aus...")
+    #     results = runner.run_tasks(
+    #         task_ids=['task_3_diagnostic'],
+    #         patient_ids=['01'],
+    #         model_name='mental_alpaca',
+    #         dependency_mode=dep_mode,
+    #         saved_results_dir="./results" if dep_mode == DependencyMode.SAVED_RESULTS else None,
+    #         num_runs=1,
+    #     )
 
     print("TaskRunner bitte über TaskRunner.run_tasks() aufrufen!")
