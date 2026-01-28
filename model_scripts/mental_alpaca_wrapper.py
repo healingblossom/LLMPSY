@@ -3,30 +3,37 @@
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 
+
 class MentalAlpacaWrapper():
     def __init__(self):
-        self.tokenizer = AutoTokenizer.from_pretrained("NEU-HAI/Llama-2-7b-alpaca-cleaned", use_fast=False)
+        local_dir = "/sc-scratch/sc-scratch-dhzc-psycho/data/models/Llama-2-7b-alpaca-cleaned"  # todo von config nehmen
+        self.tokenizer = AutoTokenizer.from_pretrained(local_dir, device_map="auto", dtype="auto")
         self.tokenizer.pad_token = self.tokenizer.unk_token
-        self.model = AutoModelForCausalLM.from_pretrained( "NEU-HAI/Llama-2-7b-alpaca-cleaned", load_in_8bit=True, device_map="auto", torch_dtype=torch.float16)
+        self.model = AutoModelForCausalLM.from_pretrained(local_dir, device_map="auto", dtype="auto")
 
     def generate_from_prompt(self, prompt):
-        prompt = prompt
+        prompt = self.tokenizer(prompt, return_tensors="pt").to("cuda")
 
-        self.tokenizer(prompt, return_tensors="pt").to("cuda")
         with torch.no_grad():
-            outputs = model.generate(
-                inputs.input_ids,
-                max_new_tokens=150,
-                do_sample=False,  # Use greedy decoding
-                pad_token_id=tokenizer.pad_token_id,
-                eos_token_id=tokenizer.eos_token_id
-            )
+            outputs = self.model.generate(**prompt, max_new_tokens=40)
         return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-
-# ============================================================================
-# Tests
-# ============================================================================
+    # ============================================================================
+    # Tests
+    # ============================================================================
 
     def generate_from_prompt_test(self, prompt):
         return prompt
+
+
+def main():
+    print("1")
+    model = MentalAlpacaWrapper()
+    print("3")
+    answer = model.generate_from_prompt("hi, antworte mit 'nein'")
+    print(answer)
+
+
+if __name__ == "__main__":
+    main()
+
