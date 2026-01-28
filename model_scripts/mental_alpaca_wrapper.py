@@ -1,10 +1,5 @@
 # mental_alpaca.py
 
-from prompts.prompt_builder import AlpacaPromptBuilder
-from run_in_env import run_in_conda_env
-
-import tasks_runner
-
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 
